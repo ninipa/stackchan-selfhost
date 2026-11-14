@@ -10,11 +10,11 @@
 
 配置项（config["Memory"]["mem_core"]）：
     memory_path        存储文件，默认 data/memory.json
-    max_profile_chars  档案总长度上限，默认 300
+    max_profile_chars  档案总长度上限，默认 800
     max_events         事件条数上限，默认 200
     ttl_days           事件过期天数，默认 365（0 = 不过期）
     retrieve_top_k     检索注入条数，默认 5
-    inject_max_chars   注入文本总长度上限，默认 600
+    inject_max_chars   注入文本总长度上限，默认 1000
     min_user_turns     门槛：用户轮数低于此值才可能跳过，默认 2
     min_user_chars     门槛：单轮且用户总字数低于此值才跳过，默认 8（只拦"嗯""好的"）
     compact_threshold  事件超过此条数触发压缩，默认 150（0 = 不压缩）
@@ -35,8 +35,23 @@ TAG = __name__
 
 DEFAULT_MEMORY_PATH = "data/memory.json"
 
-# 档案只允许这些键，避免同义词堆积（城市/所在地/常住地）
-PROFILE_KEYS = ["称呼", "城市", "时区", "回答偏好", "语言", "家人", "宠物", "职业"]
+# 档案只允许这些键，避免同义词堆积（城市/所在地/常住地）。
+# 白名单外的键不再丢弃，而是转成一条事件（见 _merge），保证信息不丢。
+PROFILE_KEYS = [
+    "称呼",
+    "城市",
+    "时区",
+    "语言",
+    "家人",
+    "宠物",
+    "职业",
+    "饮食偏好",
+    "兴趣爱好",
+    "健康状况",
+    "作息",
+    "纪念日",
+    "回答偏好",
+]
 
 # 模型可能输出的同义键，统一映射到白名单
 PROFILE_KEY_ALIASES = {
@@ -52,7 +67,32 @@ PROFILE_KEY_ALIASES = {
     "风格": "回答偏好",
     "偏好": "回答偏好",
     "语言偏好": "语言",
+    "口味": "饮食偏好",
+    "饮食": "饮食偏好",
+    "爱吃": "饮食偏好",
+    "忌口": "饮食偏好",
+    "爱好": "兴趣爱好",
+    "兴趣": "兴趣爱好",
+    "健康": "健康状况",
+    "过敏": "健康状况",
+    "作息习惯": "作息",
+    "生日": "纪念日",
+    "口味偏好": "饮食偏好",
+    "健康状态": "健康状况",
 }
+
+# 问「记忆里有什么」这类元问题不含事件关键词，靠它触发最近事件注入
+META_QUERY_WORDS = (
+    "记忆",
+    "记得",
+    "记住",
+    "复述",
+    "哪些事",
+    "什么事",
+    "说过",
+    "告诉过",
+    "聊过",
+)
 
 # 抽取提示词：只认用户陈述/确认，助手的话只作上下文。
 EXTRACT_PROMPT = """你是记忆抽取器。只做一件事：从对话中抽取"值得长期记住"的信息。
@@ -64,8 +104,10 @@ EXTRACT_PROMPT = """你是记忆抽取器。只做一件事：从对话中抽取
 2. assistant 的话只用于理解上下文，不得作为事实来源。assistant 的承诺单独记为事件。
 3. 不记：提问（"我叫什么"不是事实）、寒暄、一次性查询（天气/时间/新闻/笑话）、
    临时情绪（"今天好累"），除非用户明确表达长期偏好。
-4. profile 只放稳定事实，键只能从这些里选（没有合适的就不记）：
-   称呼、城市、时区、回答偏好、语言、家人、宠物、职业。值要短（≤20 字）。
+   用户明确要求「记住」的内容一律记：偏好进 profile，具体的事/计划进 events。
+4. profile 只放稳定事实，键只能从这些里选（没有合适的就写成事件，不要自造键）：
+   称呼、城市、时区、语言、家人、宠物、职业、饮食偏好、兴趣爱好、健康状况、作息、纪念日、回答偏好。
+   值必须是短语（谁 / 是什么），≤50 字；不写时间、不写计划、不写过程——这些归 events。
 5. events 放具体的事、承诺、项目，每条 ≤40 字，带 1-3 个标签。
    **相对时间必须换算成绝对日期**：按下面给出的"今天"换算，写「11月10日」而不是「明天」；
    文本里不要出现今天/明天/后天/下周/下个月这类词——它们过期后会变成错误信息。
@@ -93,11 +135,11 @@ class MemoryProvider(MemoryProviderBase):
         self.memory_path = self.config.get("memory_path") or (
             get_project_dir() + DEFAULT_MEMORY_PATH
         )
-        self.max_profile_chars = int(self.config.get("max_profile_chars", 300))
+        self.max_profile_chars = int(self.config.get("max_profile_chars", 800))
         self.max_events = int(self.config.get("max_events", 200))
         self.ttl_days = int(self.config.get("ttl_days", 365))
         self.retrieve_top_k = int(self.config.get("retrieve_top_k", 5))
-        self.inject_max_chars = int(self.config.get("inject_max_chars", 600))
+        self.inject_max_chars = int(self.config.get("inject_max_chars", 1000))
         self.min_user_turns = int(self.config.get("min_user_turns", 2))
         self.min_user_chars = int(self.config.get("min_user_chars", 8))
         self.compact_threshold = int(self.config.get("compact_threshold", 150))
@@ -297,20 +339,25 @@ class MemoryProvider(MemoryProviderBase):
 
     def _merge(self, bucket: Dict[str, Any], delta: Dict[str, Any]) -> None:
         today = time.strftime("%Y-%m-%d")
+        extra_events: List[Dict[str, Any]] = []
 
-        # 档案：覆盖式更新（supersession），键先归一化再按白名单过滤
+        # 档案：覆盖式更新（supersession），键先归一化再按白名单过滤。
+        # 白名单外的键不丢：转成事件（自由文本、可检索），避免静默丢失信息。
         for key, value in delta.get("profile", {}).items():
             if not isinstance(key, str) or not key.strip():
                 continue
             if value is None:
                 continue
-            value = str(value).strip()[:20]
+            value = self._clip(str(value), 50)
             if not value:
                 continue
             raw_key = key.strip()[:10]
             canonical = PROFILE_KEY_ALIASES.get(raw_key, raw_key)
             if canonical not in PROFILE_KEYS:
-                logger.bind(tag=TAG).debug(f"丢弃白名单外的档案键: {raw_key}")
+                logger.bind(tag=TAG).info(f"档案键 {raw_key} 不在白名单，转为事件")
+                extra_events.append(
+                    {"text": f"{canonical}：{value}", "tags": [canonical]}
+                )
                 continue
             bucket["profile"][canonical] = value
             bucket["profile_updated"][canonical] = today
@@ -323,16 +370,16 @@ class MemoryProvider(MemoryProviderBase):
                 if event.get("status") == "open" and kw.strip()[:20] in event.get("text", ""):
                     event["status"] = "done"
 
-        # 事件：去重后追加
+        # 事件：去重后追加（含白名单转成的事件）
         existing = {
             (e.get("date", ""), self._norm(e.get("text", ""))) for e in bucket["events"]
         }
-        for item in delta.get("events", []):
+        for item in list(delta.get("events", [])) + extra_events:
             if isinstance(item, str):
                 item = {"text": item}
             if not isinstance(item, dict):
                 continue
-            text = str(item.get("text", "")).strip()[:60]
+            text = self._clip(str(item.get("text", "")), 60)
             if not text:
                 continue
             key = (today, self._norm(text))
@@ -352,6 +399,14 @@ class MemoryProvider(MemoryProviderBase):
     @staticmethod
     def _norm(text: str) -> str:
         return re.sub(r"\s+", "", text).lower()
+
+    @staticmethod
+    def _clip(text: str, limit: int) -> str:
+        """超长截断并加省略号（硬切会让「儿子豆包上」这种断句很难看）。"""
+        text = (text or "").strip()
+        if len(text) <= limit:
+            return text
+        return text[: max(limit - 1, 0)] + "…"
 
     @staticmethod
     def _parse_due(value: Any) -> str:
@@ -465,11 +520,23 @@ class MemoryProvider(MemoryProviderBase):
                     grams.add(g)
         return list(grams)
 
+    @staticmethod
+    def _is_meta_query(query: str) -> bool:
+        """「你记得什么 / 复述一下记忆」这类元问题不含事件关键词，单独放行最近事件。"""
+        return any(word in (query or "") for word in META_QUERY_WORDS)
+
+    def _recent_events(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        k = max(self.retrieve_top_k, 1)
+        alive = [e for e in events if e.get("status") != "done"] or list(events)
+        return list(reversed(alive[-k:]))
+
     def _match_events(self, query: str) -> List[Dict[str, Any]]:
         bucket = self._bucket()
         events = bucket.get("events", [])
         if not events:
             return []
+        if self._is_meta_query(query):
+            return self._recent_events(events)
         grams = self._keywords(query)
         if not grams:
             return []

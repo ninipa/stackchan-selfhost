@@ -3,10 +3,10 @@ Memory:
     type: mem_core
     # 绝对路径：provider 直接用配置值，不依赖容器 WORKDIR
     memory_path: /opt/xiaozhi-esp32-server/data/memory.json
-    max_profile_chars: 300
+    max_profile_chars: 800
     max_events: 200
     ttl_days: 365
     retrieve_top_k: 5
-    inject_max_chars: 600
+    inject_max_chars: 1000
     min_user_turns: 2
     min_user_chars: 8
