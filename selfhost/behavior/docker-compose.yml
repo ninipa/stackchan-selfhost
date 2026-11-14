@@ -1,0 +1,38 @@
+services:
+  chan-behavior:
+    build:
+      context: .
+      args:
+        # 默认官方源；中国网络在 deploy.env 里填 BEHAVIOR_BASE_IMAGE / APT_MIRROR / PIP_INDEX_URL
+        BASE_IMAGE: ${BEHAVIOR_BASE_IMAGE:-python:3.12-slim}
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    container_name: chan-behavior
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    env_file:
+      - .env
+    environment:
+      # TZ 由 render 生成的 behavior/.env 提供；未设置时回落上海。
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      # 生产：代码在镜像里；只挂运行数据和小智配置（只读）。
+      - ./data:/data
+      # 只读挂 xiaozhi 的 data 目录：设置页要显示"主对话音色"当前是什么，
+      # 那个值在 ../data/.config.yaml 里，behavior 自己读不到。
+      # 挂目录而不是挂单个文件——bind mount 的源不存在时 docker 会造一个同名目录，
+      # 之后读文件会报 IsADirectoryError，排查起来很费劲。
+      - ../data:/xiaozhi-config:ro
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8100"
+      # 设备每 15s 自己发 heartbeat；服务端 ping 太频繁会触发 uvicorn 超时断开
+      - --ws-ping-interval
+      - "3600"
+      - --ws-ping-timeout
+      - "60"

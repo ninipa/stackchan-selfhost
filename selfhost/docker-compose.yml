@@ -1,0 +1,47 @@
+# Docker安装Server
+
+services:
+  xiaozhi-esp32-server:
+    # 2026-11-13：pin 到实测 digest（nju 镜像，7 个挂载补丁按它验证过）。
+    # 官方 ghcr.io 的 server_latest 当前 index 是 sha256:cece…（更新），
+    # 换官方源前必须重新验证 patches/。用 deploy.env 的 XIAOZHI_IMAGE 可覆盖。
+    image: ${XIAOZHI_IMAGE:-ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server@sha256:d80a172982e8b55746ae71d09015bfbdf06523f3f78550c305e253141010b947}
+    container_name: xiaozhi-esp32-server
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      # TZ 由 deploy.env → render 生成的 selfhost/.env 提供；未设置时回落上海。
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      # ws服务端
+      - "8000:8000"
+      # http服务的端口，用于简单OTA接口(单服务部署)，以及视觉分析接口
+      - "8003:8003"
+    volumes:
+      # 配置文件目录
+      - ./data:/opt/xiaozhi-esp32-server/data
+      # 模型文件挂接，很重要
+      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
+      # 补丁：TTS 预缓冲 2→10 帧（容器重建不丢；升级镜像后需重新同步此文件）
+      - ./patches/sendAudioHandle.py:/opt/xiaozhi-esp32-server/core/handle/sendAudioHandle.py:ro
+      # 补丁：TTS 整段合成（batch_mode: true 时只在回复末尾调用一次 TTS）
+      - ./patches/tts_base_batch.py:/opt/xiaozhi-esp32-server/core/providers/tts/base.py:ro
+      # 补丁：EdgeTTS 流式合成（stream_mode: true 时边收边编码 Opus）
+      - ./patches/edge.py:/opt/xiaozhi-esp32-server/core/providers/tts/edge.py:ro
+      # 补丁：语音 Opus 码率 24k→32k（行为服务已验证 32k 无咔哒）
+      - ./patches/opus_encoder_utils.py:/opt/xiaozhi-esp32-server/core/utils/opus_encoder_utils.py:ro
+      # 补丁：回复生成中不触发"无语音退出"（close_connection_no_voice_time 的宽限窗口）
+      - ./patches/receiveAudioHandle.py:/opt/xiaozhi-esp32-server/core/handle/receiveAudioHandle.py:ro
+      # 补丁：LLM 客户端开放 max_retries（默认 1 次，避免 SDK 默认 2 次把等待放大）
+      - ./patches/openai_llm.py:/opt/xiaozhi-esp32-server/core/providers/llm/openai/openai.py:ro
+      # 新增插件（不是覆盖）：DeepSeek Search 联网检索。插件目录是扫描发现的，
+      # 新文件自动注册，不触碰上游 web_search.py。
+      - ./patches/functions/deepsearch.py:/opt/xiaozhi-esp32-server/plugins_func/functions/deepsearch.py:ro
+      # 新增记忆 provider（不是覆盖）：档案常驻 + 事件检索。工厂按
+      # core/providers/memory/<name>/<name>.py 动态 import，新目录自动可用。
+      - ./patches/memory/mem_core:/opt/xiaozhi-esp32-server/core/providers/memory/mem_core:ro
+      # 固定结束语音频（预生成 wav，闲置退出时直接播，不走 LLM）
+      - ./assets/end_prompt.wav:/opt/xiaozhi-esp32-server/config/assets/end_prompt.wav:ro
+      # 补丁：可配置关闭设备端 MCP 工具（11 个工具约 2000-3000 token/轮）
+      - ./patches/mcpMessageHandler.py:/opt/xiaozhi-esp32-server/core/handle/textHandler/mcpMessageHandler.py:ro

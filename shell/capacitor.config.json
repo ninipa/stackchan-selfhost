@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.ninipa.stackchan",
+  "appName": "StackChan",
+  "webDir": "www",
+  "backgroundColor": "#F5F0E7",
+  "android": {
+    "allowMixedContent": true
+  }
+}

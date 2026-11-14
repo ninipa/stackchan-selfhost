@@ -1,0 +1,7 @@
+# 由 tools/configure.sh 生成（不要手改）。这是示例，展示生成后的形状。
+# 真实文件 sdkconfig.defaults.local 已 gitignore。
+CONFIG_OTA_URL="http://192.168.1.20:8003/xiaozhi/ota/"
+CONFIG_CHAN_BEHAVIOR_WS_URL="ws://192.168.1.20:8100/device/ws?token=REPLACE_WITH_64_HEX"
+CONFIG_CHAN_TELEOP_VIDEO_WS_URL="ws://192.168.1.20:8100/device/video?token=REPLACE_WITH_64_HEX"
+# 仅静态 TX buffer 生效；dynamic TX buffer 下这行会被忽略。
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=8

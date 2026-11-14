@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 #include "hal.h"
+#include "chan_snapshot.h"
+#include <esp_log.h>
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
@@ -131,6 +133,12 @@ void Hal::updateHeapStatusLog()
 /*                                   Xiaozhi                                  */
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
+#include "behavior/behavior_client.h"
+#include "behavior/behavior_runtime.h"
+#include "behavior/teleop.h"
+#if CONFIG_CHAN_SPIKE_ENABLED
+#include "behavior/spike_client.h"
+#endif
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
@@ -162,6 +170,17 @@ static void _stackchan_update_task(void* param)
         if (!hal_bridge::is_xiaozhi_ready()) {
             continue;
         }
+
+        // 控制面：连上行为服务并按脚本执行
+        behavior_client_start();
+        // 遥控台：视频通道 + 会话状态（控制走上面的行为 WS）
+        teleop_start();
+#if CONFIG_CHAN_SPIKE_ENABLED
+        // 遥控台 spike（临时实验）：独立视频 WS，不影响上面的控制面
+        spike_client_start();
+#endif
+        behavior_runtime_update();
+        chan_snapshot_poll();
 
         if (!is_setup_done) {
             // Setup when xiaozhi ready
@@ -279,15 +298,25 @@ uint8_t Hal::getSpeakerVolume()
 /*                                    Lvgl                                    */
 /* -------------------------------------------------------------------------- */
 #include "board/hal_bridge.h"
+#include "behavior/pomodoro.h"
 #include <stackchan/stackchan.h>
+
+// 触摸手势判定（2026-11-08 真机实测后改为 indev 级）
+//
+// 不再依赖 LVGL 的对象命中与 LV_EVENT_CLICKED：同一块面板、连坐标都相同的两次点按，
+// 实测有一次出 CLICKED、一次不出（LVGL 内部还要看 act_obj / scroll_obj / long_pr_sent），
+// 对"整屏只有一种点击语义"的 agent 模式是多余的复杂度，也是"点了没反应"的第二个来源。
+// 这里直接按 indev 的按下/松开跳变判定：一次按下 + 一次松开 = 一次点击，物理上必然成立。
+//
+// 番茄钟的「完成 / 放弃任务 / 继续专注」抽屉也走这条路：长按开抽屉，
+// 抽屉打开时短按按坐标命中（见 pomodoro_panel_tap），不依赖 LVGL 控件。
+static constexpr uint32_t kTouchLongPressMs = 700;  // 超过即长按（计时中=开抽屉，否则=中止回复）
+static constexpr uint32_t kTouchTapMinGapMs = 300;  // 两次点击的最小间隔（防手抖连击）
 
 static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data)
 {
     hal_bridge::lock();
     auto& bridge_data = hal_bridge::get_data();
-
-    // mclog::tagInfo(_tag, "touchpoint: {}, x: {}, y: {}", bridge_data.touchPoint.num, bridge_data.touchPoint.x,
-    //                bridge_data.touchPoint.y);
 
     if (bridge_data.touchPoint.num == 0) {
         data->state = LV_INDEV_STATE_RELEASED;
@@ -295,9 +324,69 @@ static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data)
         data->state   = LV_INDEV_STATE_PRESSED;
         data->point.x = bridge_data.touchPoint.x;
         data->point.y = bridge_data.touchPoint.y;
+        // 这次按下已经送达 LVGL，允许下一轮回到 RELEASED
+        bridge_data.touchPressLatched = false;
     }
 
     hal_bridge::unlock();
+
+    static bool last_pressed   = false;
+    static uint32_t press_ms   = 0;
+    static bool long_fired     = false;
+    static uint32_t last_tap_ms = 0;
+    static int32_t last_x       = 0;
+    static int32_t last_y       = 0;
+
+    const bool pressed = data->state == LV_INDEV_STATE_PRESSED;
+    const uint32_t now = lv_tick_get();
+
+    // [TP] 状态跳变日志，配合驱动层的 [TP] panel 日志定位丢点发生在哪一层
+    if (pressed != last_pressed) {
+        ESP_LOGI("Hal", "[TP] lvgl %s at (%d,%d)", pressed ? "PRESS" : "RELEASE", (int)data->point.x,
+                 (int)data->point.y);
+    }
+
+    if (pressed) {
+        last_x = data->point.x;
+        last_y = data->point.y;
+    }
+
+    if (pressed && !last_pressed) {
+        press_ms   = now;
+        long_fired = false;
+    } else if (pressed) {
+        // 按住不放：到点触发一次长按（read_cb 每帧都会进来，正好当轮询用）
+        if (!long_fired && (now - press_ms) >= kTouchLongPressMs) {
+            long_fired = true;
+            ESP_LOGI("Hal", "[TP] long-press held %ums", (unsigned)(now - press_ms));
+            if (pomodoro_hud_visible()) {
+                // 计时中：长按开抽屉（完成 / 放弃任务 / 继续专注）
+                pomodoro_panel_open();
+            } else {
+                hal_bridge::abort_xiaozhi_speaking();
+            }
+        }
+    } else if (last_pressed) {
+        // 松开：短按算一次点击
+        const uint32_t held_ms = now - press_ms;
+        if (!long_fired) {
+            if (pomodoro_panel_active()) {
+                // 抽屉打开时，点击语义改成按坐标命中；用松手前的最后一帧坐标，
+                // 免得 release 事件里 point 被清成 (0,0) 而落到左上角
+                pomodoro_panel_tap(last_x, last_y);
+            } else if (last_tap_ms != 0 && (now - last_tap_ms) < kTouchTapMinGapMs) {
+                ESP_LOGI("Hal", "[TP] tap dropped: debounce %ums", (unsigned)(now - last_tap_ms));
+            } else if (!hal_bridge::is_xiaozhi_ready()) {
+                ESP_LOGI("Hal", "[TP] tap ignored: xiaozhi not ready");
+            } else {
+                last_tap_ms = now;
+                ESP_LOGI("Hal", "[TP] tap accepted (held %ums)", (unsigned)held_ms);
+                hal_bridge::toggle_xiaozhi_chat_state();
+            }
+        }
+    }
+
+    last_pressed = pressed;
 }
 
 void Hal::lvgl_init()
@@ -312,6 +401,9 @@ void Hal::lvgl_init()
     lv_indev_set_read_cb(lvTouchpad, lvgl_read_cb);
     lv_indev_set_group(lvTouchpad, lv_group_get_default());
     lv_indev_set_display(lvTouchpad, hal_bridge::display_get_lvgl_display());
+    // 长按阈值 700ms（默认 400ms 太容易把"慢一点的点按"误判成长按）。
+    // 长按的语义是"中止当前回复"，不能和普通点按混在一起。
+    lv_indev_set_long_press_time(lvTouchpad, 700);
 
     hal_bridge::disply_lvgl_unlock();
 }

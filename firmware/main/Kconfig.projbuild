@@ -2,12 +2,13 @@ menu "StackChan Server"
 
 config STACKCHAN_SERVER_URL
     string "StackChan server base URL"
-    default "http://47.113.125.164:12800"
+    default ""
     help
         Base URL (scheme + host + port, no trailing slash) of the StackChan backend.
         The HAL composes endpoint paths like /stackChan/device/user,
-        /stackChan/apps and /stackChan/ws from this base. Override in your
-        sdkconfig.defaults.local to point at a self-hosted deployment.
+        /stackChan/apps and /stackChan/ws from this base.
+        Leave empty for self-hosted deployments (M5 account/App Center features
+        need production keys that the public source does not contain).
 
 endmenu
 
@@ -1024,5 +1025,36 @@ menu "BLE prph Configuration"
         prompt "Enable resolving peer address"
         help
             Use this option to enable resolving peer's address.
+
+endmenu
+
+menu "Chan Behavior"
+
+    config CHAN_BEHAVIOR_WS_URL
+        string "Behavior control WebSocket URL"
+        default ""
+        help
+            由 tools/configure.sh 从 local.conf 生成，不要手改。
+            为空时构建会失败（不会回落到任何作者地址）。
+
+    config CHAN_TELEOP_VIDEO_WS_URL
+        string "Teleop video WebSocket URL"
+        default ""
+        help
+            遥控台视频通道：设备主动外连行为服务的 /device/video。
+            只推帧，不接收命令（控制走 CHAN_BEHAVIOR_WS_URL）。
+            由 tools/configure.sh 从 local.conf 生成。
+
+    config CHAN_SPIKE_ENABLED
+        bool "Enable teleop spike client (temporary evaluation)"
+        default n
+        help
+            评估用实验代码：向独立 WebSocket 推摄像头 JPEG 帧，并提供 ping/RTT、
+            Wi-Fi 省电开关、内存采样、拍照等命令。遥控台正式实现后删除。
+
+    config CHAN_SPIKE_WS_URL
+        string "Teleop spike WebSocket URL"
+        depends on CHAN_SPIKE_ENABLED
+        default ""
 
 endmenu

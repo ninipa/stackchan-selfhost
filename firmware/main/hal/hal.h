@@ -231,6 +231,11 @@ public:
     /* --------------------------------- HeadPet -------------------------------- */
     uitk::Signal<HeadPetGesture> onHeadPetGesture;
 
+    // 头部触摸的原始状态（供 app 读取；手势信号里不带位置）
+    // position: -100 ~ 100，由三通道强度加权得出
+    bool isHeadTouched();
+    int16_t getHeadTouchPosition();
+
     /* ----------------------------------- RGB ---------------------------------- */
     void setRgbColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
     void showRgbColor(uint8_t r, uint8_t g, uint8_t b);

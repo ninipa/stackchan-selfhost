@@ -6,6 +6,7 @@
 #pragma once
 #include "../modifiable.h"
 #include <hal/hal.h>
+#include <esp_log.h>
 #include <cstdint>
 
 namespace stackchan {
@@ -77,13 +78,24 @@ private:
             auto& avatar = stackchan.avatar();
 
             avatar.setModifyLock(true);
-            avatar.leftEye().setVisible(false);
-            avatar.rightEye().setVisible(false);
+            // 摇晃 → 眩晕表情（螺旋眼），不再把眼睛整个藏起来
+            _prev_emotion = avatar.getEmotion();
+            avatar.setEmotion(avatar::Emotion::Dizzy);
+            _applied_version = avatar.getEmotionVersion();
+            // 记下晃动前的姿态：反应结束要还回去，否则头会一直停在 goHome 的 0°
+            auto angles = stackchan.motion().getCurrentAngles();
+            _prev_yaw    = angles.x;
+            _prev_pitch  = angles.y;
+            ESP_LOGI(_tag, "shake start, prev emotion %d, pose %d/%d", static_cast<int>(_prev_emotion),
+                     static_cast<int>(_prev_yaw), static_cast<int>(_prev_pitch));
 
             stackchan.avatar().removeDecorator(_dizzy_decorator_id);
             stackchan.avatar().removeDecorator(_shy_decorator_id);
-            _dizzy_decorator_id =
-                stackchan.avatar().addDecorator(std::make_unique<avatar::DizzyDecorator>(lv_screen_active(), 0, 300));
+
+            // 不要在加 Dizzy 表情的同时再叠一个 DizzyDecorator：
+            // 表情本身已经在两只眼睛里各画了一个螺旋，装饰器又在 ±70,-16 画两个，
+            // 屏幕上就成了"一边两个眼睛、一共四个"。
+            _dizzy_decorator_id = -1;
             _shy_decorator_id =
                 stackchan.avatar().addDecorator(std::make_unique<avatar::ShyDecorator>(lv_screen_active(), 0));
         }
@@ -103,8 +115,6 @@ private:
 
         auto& avatar = stackchan.avatar();
         avatar.setModifyLock(false);
-        avatar.leftEye().setVisible(true);
-        avatar.rightEye().setVisible(true);
         avatar.mouth().setWeight(0);
         avatar.mouth().setRotation(0);
 
@@ -115,8 +125,20 @@ private:
 
         auto& motion = stackchan.motion();
         motion.setModifyLock(false);
+        // 姿态无条件还回去：摇晃反应期间可能没人动过姿势，停在 goHome 的 0° 就是错的
+        motion.moveWithSpeed(_prev_yaw, _prev_pitch, 300);
 
         _is_reacting = false;
+
+        // 反应期间别人改过表情（对话回复、番茄钟表演…）就别再还原，
+        // 否则会把几秒前拍下的旧表情盖回去。版本号没变才轮到我们还原。
+        if (avatar.getEmotionVersion() != _applied_version) {
+            ESP_LOGW(_tag, "shake restore skipped, emotion changed meanwhile (now %d)",
+                     static_cast<int>(avatar.getEmotion()));
+            return;
+        }
+        avatar.setEmotion(_prev_emotion);
+        ESP_LOGI(_tag, "shake restore -> %d", static_cast<int>(_prev_emotion));
     }
 
     // 信号相关
@@ -130,8 +152,14 @@ private:
     uint32_t _next_toggle_tick = 0;
     uint32_t _reaction_duration_ms;
 
+    avatar::Emotion _prev_emotion = avatar::Emotion::Neutral;
+    uint32_t _applied_version = 0;
+    int32_t _prev_yaw         = 0;
+    int32_t _prev_pitch       = 0;
     int _dizzy_decorator_id = -1;
     int _shy_decorator_id   = -1;
+
+    static constexpr const char* _tag = "ImuEvent";
 };
 
 }  // namespace stackchan

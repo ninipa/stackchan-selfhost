@@ -12,6 +12,7 @@
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <wifi_station.h>
+#include <esp_wifi.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_ili9341.h>
@@ -21,6 +22,7 @@
 #include "stackchan_camera.h"
 #include "hal_bridge.h"
 #include <hal/hal.h>
+#include "hal/behavior/behavior_runtime.h"
 
 #define TAG "M5Stack-StackChan-Board"
 
@@ -367,6 +369,7 @@ private:
     int64_t last_power_state_check_ms_        = 0;
     int64_t last_power_error_log_ms_          = 0;
     uint32_t consecutive_power_read_failures_ = 0;
+    int last_panel_num_                       = 0;  // [TP] 面板按下状态，仅用于日志去重
 
     bool ShouldEnablePowerSave(bool has_external_power, bool is_discharging) const
     {
@@ -412,6 +415,21 @@ private:
 
         if (status_err == ESP_OK) {
             UpdatePowerSaveEnabled(has_external_power, discharging);
+
+            // Wi-Fi 省电跟随外接电源（2026-11-12 用户定）：插电时关 modem sleep。
+            // 注意 xiaozhi 在 idle 时会主动调 board.SetPowerSaveLevel(LOW_POWER) 把 PS 设成
+            // MAX_MODEM（application.cc 多处），只在启动时设一次会被覆盖——所以这里 1 秒轮询校正。
+            if (has_external_power) {
+                wifi_ps_type_t actual = WIFI_PS_NONE;
+                if (esp_wifi_get_ps(&actual) == ESP_OK && actual != WIFI_PS_NONE) {
+                    const esp_err_t ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
+                    if (ps_err == ESP_OK) {
+                        ESP_LOGI(TAG, "Wi-Fi power save forced off (was level %d)", (int)actual);
+                    } else if (ps_err != ESP_ERR_WIFI_NOT_INIT) {
+                        ESP_LOGW(TAG, "esp_wifi_set_ps failed: %s", esp_err_to_name(ps_err));
+                    }
+                }
+            }
         }
 
         if (status_err != ESP_OK || level_err != ESP_OK) {
@@ -531,6 +549,13 @@ private:
             return;
         }
         auto& touch_point = ft6336_->GetTouchPoint();
+
+        // [TP] 只在面板状态跳变时打印（20ms 轮询，逐帧打会刷屏）
+        if (touch_point.num != last_panel_num_) {
+            ESP_LOGI(TAG, "[TP] panel %s num=%d raw=(%d,%d)", touch_point.num ? "PRESS" : "RELEASE",
+                     touch_point.num, touch_point.x, touch_point.y);
+            last_panel_num_ = touch_point.num;
+        }
 
         // Update hal touch point
         hal_bridge::set_touch_point(touch_point.num, touch_point.x, touch_point.y);
@@ -844,10 +869,38 @@ uint8_t hal_bridge::board_get_speaker_volume()
 
 void hal_bridge::toggle_xiaozhi_chat_state()
 {
-    auto& app = Application::GetInstance();
-    if (app.GetDeviceState() == kDeviceStateStarting) {
+    // 用户点屏幕/按键唤醒：行为表演必须让位给语音
+    behavior_runtime_on_voice_activity();
+
+    auto& app   = Application::GetInstance();
+    auto state  = app.GetDeviceState();
+    if (state == kDeviceStateStarting) {
         // EnterWifiConfigMode();
+        ESP_LOGI(TAG, "[TP] toggle ignored: device starting");
         return;
     }
+
+    // 2026-11-08：说话中点击不再中止整段回复。
+    // 原来 ToggleChatState 在 speaking 状态下直接 AbortSpeaking，而屏幕上没有"正在说"的
+    // 明显提示，一次误点就把整段回复截断（第二篇被截断就是这么来的）。
+    // 中止改由长按触发（见 hal_bridge::abort_xiaozhi_speaking）。
+    if (state == kDeviceStateSpeaking) {
+        ESP_LOGI(TAG, "[TP] tap ignored: speaking (long-press to abort)");
+        return;
+    }
+
+    ESP_LOGI(TAG, "[TP] toggle from state %d -> ToggleChatState", (int)state);
     app.ToggleChatState();
+}
+
+void hal_bridge::abort_xiaozhi_speaking()
+{
+    auto& app  = Application::GetInstance();
+    auto state = app.GetDeviceState();
+    if (state != kDeviceStateSpeaking) {
+        ESP_LOGI(TAG, "[TP] long-press ignored: state %d", (int)state);
+        return;
+    }
+    ESP_LOGI(TAG, "[TP] long-press -> abort speaking");
+    app.AbortSpeaking(kAbortReasonNone);
 }

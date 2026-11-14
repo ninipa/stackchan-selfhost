@@ -1,0 +1,23 @@
+# Third-party notices
+
+This project is a fork of [M5Stack/StackChan](https://github.com/m5stack/StackChan)
+(MIT). The upstream `LICENSE` is retained in the public repository.
+
+It also uses or bundles components from these projects. Each component remains under
+its own upstream license; check the linked repository for the authoritative text.
+
+| Component | Upstream |
+|---|---|
+| M5Stack StackChan / StackChan-BSP | https://github.com/m5stack/StackChan · https://github.com/m5stack/StackChan-BSP |
+| xiaozhi-esp32 | https://github.com/78/xiaozhi-esp32 |
+| xiaozhi-esp32-server | https://github.com/xinnan-tech/xiaozhi-esp32-server |
+| mooncake / mooncake_log / smooth_ui_toolkit | https://github.com/Forairaaaaa/mooncake |
+| LVGL | https://github.com/lvgl/lvgl |
+| Noto Sans / Noto Color Emoji | https://github.com/notofonts |
+| FunASR / SenseVoiceSmall | https://github.com/modelscope/FunASR |
+| EdgeTTS | Microsoft Edge Read Aloud endpoint (no key); usage subject to Microsoft terms |
+| Capacitor | https://github.com/ionic-team/capacitor |
+| AndroidX | https://developer.android.com/jetpack/androidx |
+
+If you redistribute a build, keep the upstream license files and this notice. If you
+replace a bundled asset/model, check that asset's license separately.

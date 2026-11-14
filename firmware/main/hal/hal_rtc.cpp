@@ -123,5 +123,8 @@ void Hal::setTimezone(std::string_view tz)
 std::string Hal::getTimezone()
 {
     Settings settings("system", false);
-    return settings.GetString("tz", "GMT0");
+    // 2026-11-13：分发版默认 UTC0，不假设用户在中国。
+    // Setup → System → Timezone 可改；设置后写入 NVS，后续启动沿用。
+    // （2026-11-08 曾默认 CST-8，那是作者本机的选择，不作为分发默认。）
+    return settings.GetString("tz", "UTC0");
 }

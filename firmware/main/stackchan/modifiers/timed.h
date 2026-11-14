@@ -78,6 +78,7 @@ public:
 
         _prev_emotion = stackchan.avatar().getEmotion();
         stackchan.avatar().setEmotion(_target_emotion);
+        _applied_version = stackchan.avatar().getEmotionVersion();
     }
 
     void _on_end(Modifiable& stackchan) override
@@ -86,12 +87,17 @@ public:
             return;
         }
 
+        // 期间别人改过表情就别还原（同 HeadPet：否则会把旧表情盖回去）
+        if (stackchan.avatar().getEmotionVersion() != _applied_version) {
+            return;
+        }
         stackchan.avatar().setEmotion(_prev_emotion);
     }
 
 private:
     avatar::Emotion _prev_emotion   = avatar::Emotion::Neutral;
     avatar::Emotion _target_emotion = avatar::Emotion::Neutral;
+    uint32_t _applied_version       = 0;
 };
 
 /**

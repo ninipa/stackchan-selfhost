@@ -1,0 +1,88 @@
+# 2026-11-09 修复：回复中途"吞字"
+#
+# 现象：长回复播放时偶发丢字/卡顿，服务端下发流完整（解码回 wav 无缺失）。
+# 根因：application.cc 的 OnIncomingAudio 调用 PushPacketToDecodeQueue 时用默认 wait=false，
+#       解码队列（MAX_DECODE_PACKETS_IN_QUEUE = 20 包 / 1.2s）一满就静默丢包。
+#       固件计数实测：一次回复 dropped=9 / 14 个包（540ms / 840ms 音频）。
+# 修复：队列满时阻塞等待（回压到 WebSocket 收包线程），不再丢包。
+#
+# 应用顺序：先打 xiaozhi-esp32.patch，再打本补丁（本补丁的 application.cc hunk 基于打完主补丁后的文件）。
+# 回滚：git -C firmware/xiaozhi-esp32 checkout -- main/application.cc main/audio/audio_service.cc main/audio/audio_service.h
+
+diff --git a/main/application.cc b/main/application.cc
+--- a/main/application.cc
++++ b/main/application.cc
+@@ -552,9 +567,13 @@ void Application::InitializeProtocol() {
+     });
+ 
+     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
+         if (GetDeviceState() == kDeviceStateSpeaking) {
+-            audio_service_.PushPacketToDecodeQueue(std::move(packet));
++            // 2026-11-09：队列满时阻塞等待，不要静默丢弃。
++            // 原来 wait=false，解码队列（20 包 / 1.2s）一满就丢包，实测一次回复丢 9~14 个包，
++            // 听感是"字被吞了"。改成阻塞后由 WebSocket 收包线程回压，服务端流控队列会自然等待，
++            // 代价是这段时间内 abort/stop 消息会延迟处理（实测丢包场景持续不到 1 秒）。
++            audio_service_.PushPacketToDecodeQueue(std::move(packet), true);
+         }
+     });
+ 
+     protocol_->OnAudioChannelOpened([this, codec, &board]() {
+diff --git a/main/audio/audio_service.h b/main/audio/audio_service.h
+index f8b510f..10f619f 100644
+--- a/main/audio/audio_service.h
++++ b/main/audio/audio_service.h
+@@ -193,8 +193,12 @@ private:
+     bool decode_in_flight_ = false;
+     bool output_in_flight_ = false;
+     bool playback_drained_notified_ = true;
+     uint32_t playback_generation_ = 0;
++    // 诊断（2026-11-09）：解码队列满时 wait=false 会静默丢包，听感是"字被吞"。
++    // 这两个计数在进入 Speaking（ResetDecoder）时打印并清零，用来确认丢包是否发生在设备侧。
++    uint32_t decode_drop_count_ = 0;
++    uint32_t decode_max_depth_ = 0;
+     // For server AEC
+     FixedQueue<uint32_t, MAX_TIMESTAMPS_IN_QUEUE> timestamp_queue_;
+ 
+     bool audio_engine_initialized_ = false;
+diff --git a/main/audio/audio_service.cc b/main/audio/audio_service.cc
+index 7f7582b..1bc1a15 100644
+--- a/main/audio/audio_service.cc
++++ b/main/audio/audio_service.cc
+@@ -615,16 +615,20 @@ bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> pa
+                 return service_stopped_.load() || generation != playback_generation_ ||
+                        audio_decode_queue_.size() < MAX_DECODE_PACKETS_IN_QUEUE;
+             });
+         } else {
++            ++decode_drop_count_;
+             return false;
+         }
+     }
+     if (service_stopped_.load() || generation != playback_generation_) {
+         return false;
+     }
+     playback_drained_notified_ = false;
+     audio_decode_queue_.push_back(std::move(packet));
++    if (audio_decode_queue_.size() > decode_max_depth_) {
++        decode_max_depth_ = audio_decode_queue_.size();
++    }
+     audio_queue_cv_.notify_all();
+     return true;
+ }
+ 
+@@ -798,8 +802,16 @@ bool AudioService::IsPlaybackIdle() {
+ void AudioService::ResetDecoder() {
+     bool notify_drained = false;
+     {
+         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
++        // 诊断：上一段播放期间解码队列的峰值深度与丢包数（0 丢包说明不是队列溢出）
++        if (decode_drop_count_ > 0 || decode_max_depth_ >= MAX_DECODE_PACKETS_IN_QUEUE) {
++            ESP_LOGW(TAG, "Decode queue stats: max_depth=%u/%u dropped=%u",
++                     (unsigned)decode_max_depth_, (unsigned)MAX_DECODE_PACKETS_IN_QUEUE,
++                     (unsigned)decode_drop_count_);
++        }
++        decode_drop_count_ = 0;
++        decode_max_depth_ = 0;
+         ++playback_generation_;
+         std::unique_lock<std::mutex> decoder_lock(decoder_mutex_);
+         if (opus_decoder_ != nullptr) {
+             esp_opus_dec_reset(opus_decoder_);

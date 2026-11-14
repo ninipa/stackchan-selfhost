@@ -1,0 +1,19 @@
+# 固件仓库的 gitleaks 配置：只放行示例占位符和 fetch_repos 拉下来的第三方依赖。
+# 依赖目录由 fetch_repos.py 获取，不进入本仓库历史；示例里的 token 是占位符。
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "example placeholders and fetched dependencies"
+paths = [
+  '''managed_components/''',
+  '''components/''',
+  '''xiaozhi-esp32/''',
+  '''sdkconfig.defaults.local.example''',
+  '''build/''',
+  '''build6/''',
+  '''build-verify/''',
+]
+regexes = [
+  '''REPLACE_WITH_64_HEX''',
+]

@@ -71,10 +71,56 @@ public:
         }
     }
 
+    void update() override
+    {
+        Servo::update();
+        log_haptic_feedback();
+    }
+
+    // ---- 触觉可行性探针：定期把舵机的实时状态打到串口 ----
+    // 目的只有一个：确认「手指摸上去」时 position / load / current 有没有可区分的变化。
+    // 这只是测量代码，不参与任何控制逻辑，验证完就删。
+    void log_haptic_feedback()
+    {
+        // 已停用：这行日志会在串口截屏的二进制帧中间插字，把图弄坏。
+        // 需要重新做触觉测量时把下面这行删掉即可。
+        return;
+
+        const uint32_t now = GetHAL().millis();
+        if (now - _last_haptic_log_tick < kHapticLogIntervalMs) {
+            return;
+        }
+        _last_haptic_log_tick = now;
+
+        if (_scs_bus.FeedBack(_config.id) < 0) {
+            return;
+        }
+
+        const int raw_pos = _scs_bus.ReadPos(-1);
+        const int load    = _scs_bus.ReadLoad(-1);
+        const int cur     = _scs_bus.ReadCurrent(-1);
+        const int err     = _last_cmd_raw - raw_pos;
+        int tqe           = _scs_bus.ReadToqueEnable(_config.id);
+        const int moving  = _scs_bus.ReadMove(_config.id);
+
+        // 测试专用：空闲时固件会释放扭矩（tqe=0），头是松的，摸上去读不到力。
+        // 这里强制保持扭矩，才能测「手压上去时 load/cur 有没有变化」。
+        // 验证完连同整个 log_haptic_feedback() 一起删除。
+        if (kHapticForceTorque && tqe == 0) {
+            _scs_bus.EnableTorque(_config.id, 1);
+            tqe = _scs_bus.ReadToqueEnable(_config.id);
+        }
+
+        mclog::tagInfo("HAPTIC", "id={} pos={} goal={} err={} load={} cur={} tqe={} mv={}", _config.id, raw_pos,
+                       _last_cmd_raw, err, load, cur, tqe, moving);
+    }
+
     void set_angle_impl(int angle) override
     {
         int mapped_angle = _zero_pos + angle * 16 / 5 / 10;  // 一步对应 0.3125度, 0.3125 = 5/16
         mapped_angle     = uitk::clamp(mapped_angle, _runtime_raw_pos_limit.x, _runtime_raw_pos_limit.y);
+
+        _last_cmd_raw = mapped_angle;  // 记录下发目标，用于计算跟随误差
 
         // mclog::tagInfo(_tag, "id: {} mapped angle: {}", _id, mapped_angle);
 
@@ -190,6 +236,11 @@ private:
     int _last_stall_direction       = 0;
     int _stall_confirm_count        = 0;
     bool _last_stall_feedback_valid = false;
+
+    static constexpr uint32_t kHapticLogIntervalMs = 100;
+    static constexpr bool kHapticForceTorque       = true;  // 测试用：强制保持舵机扭矩
+    uint32_t _last_haptic_log_tick                 = 0;
+    int _last_cmd_raw                              = 0;
 
     static int abs_int(int value)
     {

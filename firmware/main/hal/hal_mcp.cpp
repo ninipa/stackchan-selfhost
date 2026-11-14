@@ -8,6 +8,7 @@
 #include <mcp_server.h>
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
+#include <algorithm>
 
 using namespace stackchan;
 
@@ -42,17 +43,19 @@ void Hal::xiaozhi_mcp_init()
     mclog::tagInfo(_tag, "add robot.set_head_angles tool");
     mcp_server.AddTool("self.robot.set_head_angles",
                        "Adjust head position. GUIDELINES: "
-                       "1. For natural interaction, stay within +/- 45 degrees. "
-                       "2. Only use values > 70 if the user explicitly asks to look far away/behind. "
-                       "3. Max ranges: Yaw(-128 to 128, -128 as your left), Pitch(0 to 90, 90 as your up). "
+                       "1. For natural interaction, stay within +/- 30 degrees. "
+                       "2. Only use values beyond 45 if the user explicitly asks to look far away/behind. "
+                       "3. Max ranges: Yaw(-60 to 60, -60 as your left), Pitch(5 to 85, 85 as your up). "
                        "Speed(100-1000, 150 is natural).",
                        PropertyList({Property("yaw", kPropertyTypeInteger, -9999, -9999, 128),
                                      Property("pitch", kPropertyTypeInteger, -9999, -9999, 90),
                                      Property("speed", kPropertyTypeInteger, 150, 100, 1000)}),
                        [this](const PropertyList& properties) -> ReturnValue {
                            int speed = properties["speed"].value<int>();
-                           int yaw   = properties["yaw"].value<int>();
-                           int pitch = properties["pitch"].value<int>();
+                           // 软限位：机械行程 ±128° / 3~87°，但走满会绷住线束、贴死下限，
+                           // 实际只放 ±60° / 5~85°。超出的按边界夹住，不报错。
+                           int yaw   = std::clamp(properties["yaw"].value<int>(), -60, 60);
+                           int pitch = std::clamp(properties["pitch"].value<int>(), 5, 85);
 
                            mclog::tagInfo(_tag, "motion set_angles: yaw: {}, pitch: {}, speed: {}", yaw, pitch, speed);
 

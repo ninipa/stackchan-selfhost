@@ -1,2 +1,31 @@
 .DS_Store
 .idea/
+# StackChan companion（由 tools/export-public.sh 追加）
+# StackChan companion（由 tools/export-public.sh 追加）
+selfhost/deploy.env
+selfhost/.env
+selfhost/behavior/.env
+selfhost/behavior/.env.bak-*
+selfhost/behavior/data/
+selfhost/data/
+selfhost/models/*
+!selfhost/models/README.md
+!selfhost/models/download-model.sh
+selfhost/mimo-tts/.env
+selfhost/mimo-tts/out/
+selfhost/mimo-tts/*.log
+selfhost/*.log
+
+shell/node_modules/
+shell/android/.gradle/
+shell/android/app/build/
+shell/android/keystore.properties
+shell/android/token.properties
+shell/android/local.properties
+
+*.jks
+*.keystore
+*.log
+__pycache__/
+*.pyc
+.DS_Store

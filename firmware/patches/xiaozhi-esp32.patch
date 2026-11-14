@@ -1,14 +1,24 @@
 diff --git a/main/application.cc b/main/application.cc
-index 31de205..50096d8 100644
+index 31de205..12789bd 100644
 --- a/main/application.cc
 +++ b/main/application.cc
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,7 @@
  #include "application.h"
 +#include <hal/hal.h>
++#include "hal/behavior/chan_features.h"
++#include "hal/behavior/pomodoro.h"
  #include "assets.h"
  #include "assets/lang_config.h"
  #include "audio_codec.h"
-@@ -442,6 +443,7 @@ void Application::CheckAssetsVersion() {
+@@ -13,6 +16,7 @@
+ #include "websocket_protocol.h"
+ 
+ #include <driver/gpio.h>
++#include <esp_heap_caps.h>
+ #include <esp_log.h>
+ #include <arpa/inet.h>
+ #include <cJSON.h>
+@@ -442,6 +446,7 @@ void Application::CheckAssetsVersion() {
  void Application::CheckNewVersion() {
      const int MAX_RETRY = 10;
      int retry_count = 0;
@@ -16,7 +26,22 @@ index 31de205..50096d8 100644
      int retry_delay = 10;  // Initial retry delay in seconds
  
      auto& board = Board::GetInstance();
-@@ -499,15 +501,18 @@ void Application::CheckNewVersion() {
+@@ -449,6 +454,14 @@ void Application::CheckNewVersion() {
+         auto display = board.GetDisplay();
+         display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+ 
++        // [自建服务端调试] OTA 请求前的堆状态：定位 Wi-Fi TX buffer 分配失败
++        ESP_LOGW(TAG, "[HEAP] before OTA: dma free=%u max=%u | int free=%u max=%u | psram=%u",
++                 heap_caps_get_free_size(MALLOC_CAP_DMA),
++                 heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
++                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
++                 heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
++                 heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
++
+         auto check = ota_->CheckVersion();
+         if (!check) {
+             retry_count++;
+@@ -499,15 +512,18 @@ void Application::CheckNewVersion() {
  
          // No new version, mark the current version as valid
          ota_->MarkCurrentVersionValid();
@@ -39,7 +64,72 @@ index 31de205..50096d8 100644
          }
  
          // This will block the loop until the activation is done or timeout
-@@ -725,30 +730,6 @@ void Application::InitializeProtocol() {
+@@ -553,7 +569,11 @@ void Application::InitializeProtocol() {
+ 
+     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
+         if (GetDeviceState() == kDeviceStateSpeaking) {
+-            audio_service_.PushPacketToDecodeQueue(std::move(packet));
++            // 2026-11-09：队列满时阻塞等待，不要静默丢弃。
++            // 原来 wait=false，解码队列（20 包 / 1.2s）一满就丢包，实测一次回复丢 9~14 个包，
++            // 听感是"字被吞了"。改成阻塞后由 WebSocket 收包线程回压，服务端流控队列会自然等待，
++            // 代价是这段时间内 abort/stop 消息会延迟处理（实测丢包场景持续不到 1 秒）。
++            audio_service_.PushPacketToDecodeQueue(std::move(packet), true);
+         }
+     });
+ 
+@@ -572,6 +592,9 @@ void Application::InitializeProtocol() {
+         Schedule([this]() {
+             auto display = Board::GetInstance().GetDisplay();
+             display->SetChatMessage("system", "");
++            // 兜底：连接断了但状态机没走到 idle 时，脸会停在上一个表情。
++            // 番茄钟在超时态时要恢复困脸（刚才说话把它清成中性了），其余回中性。
++            display->SetEmotion(pomodoro_overtime() ? "sleepy" : "neutral");
+             SetDeviceState(kDeviceStateIdle);
+         });
+     });
+@@ -639,17 +662,19 @@ void Application::InitializeProtocol() {
+             } else if (strcmp(state->valuestring, "sentence_start") == 0) {
+                 auto text = cJSON_GetObjectItem(root, "text");
+                 if (cJSON_IsString(text)) {
++                    ESP_LOGI(TAG, "<< %s", text->valuestring);
++#if !CHAN_DISABLE_PER_SENTENCE_BUBBLE
+                     std::vector<TextGlyph> glyphs;
+                     uint8_t bpp = 0;
+                     if (!TextGlyphPayload::Parse(root, glyphs, bpp)) {
+                         glyphs.clear();
+                     }
+-                    ESP_LOGI(TAG, "<< %s", text->valuestring);
+                     Schedule([display, message = std::string(text->valuestring),
+                               glyphs = std::move(glyphs), bpp]() {
+                         display->AddTextGlyphs(glyphs, bpp);
+                         display->SetChatMessage("assistant", message.c_str());
+                     });
++#endif
+                 }
+             }
+         } else if (strcmp(type->valuestring, "stt") == 0) {
+@@ -670,8 +695,19 @@ void Application::InitializeProtocol() {
+         } else if (strcmp(type->valuestring, "llm") == 0) {
+             auto emotion = cJSON_GetObjectItem(root, "emotion");
+             if (cJSON_IsString(emotion)) {
+-                Schedule([display, emotion_str = std::string(emotion->valuestring)]() {
++                Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
++                    // 情绪消息可能比这一轮结束还晚到（实测 speaking 之后约 1 秒）。
++                    // 那时脸已经被回中性了，再贴上去就会把笑脸挂住 —— 所以只在这轮
++                    // 还在进行时接受。晚到的直接丢。
++                    const auto state = GetDeviceState();
++                    if (state != kDeviceStateSpeaking && state != kDeviceStateListening) {
++                        ESP_LOGW(TAG, "Drop late emotion: %s (state %d)", emotion_str.c_str(),
++                                 static_cast<int>(state));
++                        return;
++                    }
+                     display->SetEmotion(emotion_str.c_str());
++                    ESP_LOGI(TAG, "Emotion from server: %s (state %d)", emotion_str.c_str(),
++                             static_cast<int>(state));
+                 });
+             }
+         } else if (strcmp(type->valuestring, "mcp") == 0) {
+@@ -725,30 +761,6 @@ void Application::InitializeProtocol() {
      protocol_->Start();
  }
  
@@ -70,7 +160,7 @@ index 31de205..50096d8 100644
  void Application::Alert(const char* status, const char* message, const char* emotion,
                          const std::string_view& sound) {
      ESP_LOGW(TAG, "Alert [%s] %s: %s", emotion, status, message);
-@@ -833,6 +814,7 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
+@@ -833,6 +845,7 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
          if (!protocol_->OpenAudioChannel()) {
              // Return to idle so the device is not stuck in the connecting
              // state (not every failure path reports a network error)
@@ -78,7 +168,7 @@ index 31de205..50096d8 100644
              SetDeviceState(kDeviceStateIdle);
              return;
          }
-@@ -970,6 +952,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
+@@ -970,6 +983,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
              // Return to idle so the device is not stuck in the connecting
              // state (not every failure path reports a network error), and
              // wake word detection is re-enabled by the idle state handler.
@@ -86,6 +176,20 @@ index 31de205..50096d8 100644
              SetDeviceState(kDeviceStateIdle);
              return;
          }
+@@ -1013,9 +1027,11 @@ void Application::HandleStateChangedEvent() {
+             if (last_error_message_.empty()) {
+                 display->SetStatus(Lang::Strings::STANDBY);
+                 display->ClearChatMessages();  // Clear messages first
+-                display->SetEmotion(
+-                    "neutral");  // Then set emotion (wechat mode checks child count)
+             }
++            // 情绪不跟错误提示走：出错 / 异常退出时也要回中性，否则脸会停在
++            // 上一个表情上（错误提示在状态栏，不需要把脸一起冻住）。
++            // 番茄钟超时态要恢复困脸——对话期间脸被清成中性了，退出时得补回来。
++            display->SetEmotion(pomodoro_overtime() ? "sleepy" : "neutral");
+             audio_service_.EnableVoiceProcessing(false);
+             audio_service_.EnableWakeWordDetection(true);
+             break;
 diff --git a/main/application.h b/main/application.h
 index f2b9a00..68f01d1 100644
 --- a/main/application.h
@@ -98,6 +202,121 @@ index f2b9a00..68f01d1 100644
      void SetListeningMode(ListeningMode mode);
      ListeningMode GetDefaultListeningMode() const;
      
+diff --git a/main/assets.cc b/main/assets.cc
+index ee49119..157135a 100644
+--- a/main/assets.cc
++++ b/main/assets.cc
+@@ -4,6 +4,7 @@
+ #include "cjson_utils.h"
+ #include "display.h"
+ #include "lvgl_theme.h"
++#include "hal/behavior/chan_features.h"
+ #if HAVE_LVGL
+ #include <spi_flash_mmap.h>
+ #endif
+@@ -88,6 +89,13 @@ bool Assets::GetAssetData(const std::string& name, void*& ptr, size_t& size) {
+ }
+ 
+ bool Assets::LoadSrmodelsFromIndex(Assets* assets, cJSON* root) {
++#if CHAN_DISABLE_WAKE_WORD
++    (void)assets;
++    (void)root;
++    ESP_LOGW(TAG, "srmodels disabled (CHAN_DISABLE_WAKE_WORD), skip model load");
++    return true;
++#endif
++
+     void* ptr = nullptr;
+     size_t size = 0;
+     bool need_delete_root = false;
+diff --git a/main/audio/audio_service.cc b/main/audio/audio_service.cc
+index 7f7582b..1bc1a15 100644
+--- a/main/audio/audio_service.cc
++++ b/main/audio/audio_service.cc
+@@ -616,6 +616,7 @@ bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> pa
+                        audio_decode_queue_.size() < MAX_DECODE_PACKETS_IN_QUEUE;
+             });
+         } else {
++            ++decode_drop_count_;
+             return false;
+         }
+     }
+@@ -624,6 +625,9 @@ bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> pa
+     }
+     playback_drained_notified_ = false;
+     audio_decode_queue_.push_back(std::move(packet));
++    if (audio_decode_queue_.size() > decode_max_depth_) {
++        decode_max_depth_ = audio_decode_queue_.size();
++    }
+     audio_queue_cv_.notify_all();
+     return true;
+ }
+@@ -799,6 +803,14 @@ void AudioService::ResetDecoder() {
+     bool notify_drained = false;
+     {
+         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
++        // 诊断：上一段播放期间解码队列的峰值深度与丢包数（0 丢包说明不是队列溢出）
++        if (decode_drop_count_ > 0 || decode_max_depth_ >= MAX_DECODE_PACKETS_IN_QUEUE) {
++            ESP_LOGW(TAG, "Decode queue stats: max_depth=%u/%u dropped=%u",
++                     (unsigned)decode_max_depth_, (unsigned)MAX_DECODE_PACKETS_IN_QUEUE,
++                     (unsigned)decode_drop_count_);
++        }
++        decode_drop_count_ = 0;
++        decode_max_depth_ = 0;
+         ++playback_generation_;
+         std::unique_lock<std::mutex> decoder_lock(decoder_mutex_);
+         if (opus_decoder_ != nullptr) {
+diff --git a/main/audio/audio_service.h b/main/audio/audio_service.h
+index f8b510f..10f619f 100644
+--- a/main/audio/audio_service.h
++++ b/main/audio/audio_service.h
+@@ -194,6 +194,10 @@ private:
+     bool output_in_flight_ = false;
+     bool playback_drained_notified_ = true;
+     uint32_t playback_generation_ = 0;
++    // 诊断（2026-11-09）：解码队列满时 wait=false 会静默丢包，听感是"字被吞"。
++    // 这两个计数在进入 Speaking（ResetDecoder）时打印并清零，用来确认丢包是否发生在设备侧。
++    uint32_t decode_drop_count_ = 0;
++    uint32_t decode_max_depth_ = 0;
+     // For server AEC
+     FixedQueue<uint32_t, MAX_TIMESTAMPS_IN_QUEUE> timestamp_queue_;
+ 
+diff --git a/main/audio/engines/afe_audio_engine.cc b/main/audio/engines/afe_audio_engine.cc
+index 3823d10..943cfaf 100644
+--- a/main/audio/engines/afe_audio_engine.cc
++++ b/main/audio/engines/afe_audio_engine.cc
+@@ -12,10 +12,14 @@
+ 
+ #include "audio_service.h"
+ #include "wake_words/custom_wake_word.h"
++#include "hal/behavior/chan_features.h"
+ 
+ #define TAG "AfeAudioEngine"
+ 
+-#if CONFIG_USE_AUDIO_PROCESSOR
++#if CHAN_DISABLE_WAKE_WORD
++// 触摸说话模式：没有 AFE，Feed 必须走 OutputRawAudio 分支
++static constexpr bool kUseAfeForVoiceProcessing = false;
++#elif CONFIG_USE_AUDIO_PROCESSOR
+ static constexpr bool kUseAfeForVoiceProcessing = true;
+ #else
+ static constexpr bool kUseAfeForVoiceProcessing = false;
+@@ -63,6 +67,16 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
+     frame_samples_ = frame_duration_ms * 16000 / 1000;
+     output_buffer_.reserve(frame_samples_);
+ 
++#if CHAN_DISABLE_WAKE_WORD
++    // 触摸说话模式：不加载 WakeNet/SR 模型，也不创建 AFE，
++    // 直接把原始 16k 单声道交给上层（服务器端 SileroVAD 负责断句）。
++    models_ = nullptr;
++    owns_models_ = false;
++    wake_detector_ = WakeDetector::kNone;
++    ESP_LOGI(TAG, "Initialized as raw engine (wake word disabled)");
++    return true;
++#endif
++
+     if (models_list == nullptr) {
+         models_ = esp_srmodel_init("model");
+         owns_models_ = models_ != nullptr;
 diff --git a/main/boards/common/esp_video.cc b/main/boards/common/esp_video.cc
 index 2f31a49..4cf6f63 100644
 --- a/main/boards/common/esp_video.cc
@@ -539,7 +758,7 @@ index 4b034b4..1028e73 100644
  
      virtual void SetOutputVolume(int volume) override;
 diff --git a/main/ota.cc b/main/ota.cc
-index 124d333..5d0c002 100644
+index 124d333..69dc804 100644
 --- a/main/ota.cc
 +++ b/main/ota.cc
 @@ -132,19 +132,12 @@ NetworkResult<> Ota::CheckVersion() {
@@ -565,6 +784,22 @@ index 124d333..5d0c002 100644
          cJSON* challenge = cJSON_GetObjectItem(activation, "challenge");
          if (cJSON_IsString(challenge)) {
              activation_challenge_ = challenge->valuestring;
+@@ -209,10 +202,11 @@ NetworkResult<> Ota::CheckVersion() {
+             struct timeval tv;
+             double ts = timestamp->valuedouble;
+             
+-            // 如果有时区偏移，计算本地时间
+-            if (cJSON_IsNumber(timezone_offset)) {
+-                ts += (timezone_offset->valueint * 60 * 1000); // 转换分钟为毫秒
+-            }
++            // 2026-11-08：epoch 与时区无关。server_time.timestamp 本身就是 UTC 毫秒，
++            // 原实现又叠加了 timezone_offset（480 分钟），于是每次 OTA 后系统时钟快 8 小时，
++            // 直到 SNTP 把时间纠回来；NTP 不通时会一直错，而且会被写进 RTC。
++            // 时区统一交给 TZ 环境变量 + localtime() 处理，这里不再加偏移。
++            (void)timezone_offset;
+             
+             tv.tv_sec = (time_t)(ts / 1000);  // 转换毫秒为秒
+             tv.tv_usec = (suseconds_t)((long long)ts % 1000) * 1000;  // 剩余的毫秒转换为微秒
 diff --git a/main/ota.h b/main/ota.h
 index eda3fd7..ce17ee5 100644
 --- a/main/ota.h
@@ -598,3 +833,23 @@ index eda3fd7..ce17ee5 100644
      bool has_serial_number_ = false;
      bool has_activation_challenge_ = false;
      std::string current_version_;
+diff --git a/main/system_info.cc b/main/system_info.cc
+index c4a6077..a2fb4db 100644
+--- a/main/system_info.cc
++++ b/main/system_info.cc
+@@ -150,7 +150,14 @@ void SystemInfo::PrintTaskList() {
+ void SystemInfo::PrintHeapStats() {
+     int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+     int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+-    ESP_LOGI(TAG, "free sram: %u minimal sram: %u", free_sram, min_free_sram);
++    // [自建服务端调试] 追加 DMA / 内部 / PSRAM 的余量与最大连续块。
++    // Wi-Fi TX buffer 需要 ~1.6KB 的 DMA-capable 连续块，只看 free sram 会误判。
++    ESP_LOGI(TAG, "free sram: %u minimal sram: %u | dma free=%u max=%u | int max=%u | psram free=%u",
++             free_sram, min_free_sram,
++             heap_caps_get_free_size(MALLOC_CAP_DMA),
++             heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
++             heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
++             heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+ }
+ 
+ void SystemInfo::PrintPmLocks() {

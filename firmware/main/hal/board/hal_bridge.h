@@ -20,6 +20,13 @@ struct TouchPoint_t {
 
 struct Data_t {
     TouchPoint_t touchPoint;
+    // [TP] 按下锁存（2026-11-08）：FT6336 由 20ms 定时器轮询，而 LVGL 只在自己的刷新
+    // 任务里读 indev（约 30fps）。一次 30~50ms 的轻点完全可能落在两次 LVGL 读取之间，
+    // 于是点击被静默吞掉——这正是"点了没反应"的一种成因。
+    // 规则：物理按下必须被 LVGL 读到至少一次，才允许回到 RELEASED。
+    bool touchPressLatched = false;
+    int64_t touchPressUs   = 0;
+
     bool isXiaozhiMode              = false;
     bool isXiaozhiModeToggleEnabled = false;
 };
@@ -41,6 +48,8 @@ TouchPoint_t get_touch_point();
 bool is_xiaozhi_mode();
 void set_xiaozhi_mode(bool mode);
 void toggle_xiaozhi_chat_state();
+// 长按中止当前回复（speaking 状态下点击已被忽略，只留这条路给"我要打断"）
+void abort_xiaozhi_speaking();
 
 void disply_lvgl_lock();
 void disply_lvgl_unlock();

@@ -70,12 +70,13 @@ def fetch_dependencies():
 
     for repo in repos:
         repo_path = os.path.join(script_dir, repo["path"])
-        branch = repo.get("branch")
+        # ref 优先；保留 branch 兼容旧 repos.json
+        ref = repo.get("ref") or repo.get("branch")
         with_submodules = repo.get("with_submodules", False)
         patch = repo.get("patch")
         if patch and not os.path.isabs(patch):
             patch = os.path.join(script_dir, patch)
-        clone_or_update_repo(repo["url"], repo_path, branch, with_submodules, patch)
+        clone_or_update_repo(repo["url"], repo_path, ref, with_submodules, patch)
 
 
 if __name__ == "__main__":

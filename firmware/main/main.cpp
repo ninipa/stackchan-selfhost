@@ -42,6 +42,9 @@ extern "C" void app_main(void)
         hal_toggles::register_app_id(hal_toggles::App::Ezdata, GetMooncake().installApp(std::make_unique<AppEzdata>()));
         hal_toggles::register_app_id(hal_toggles::App::Dance, GetMooncake().installApp(std::make_unique<AppDance>()));
         GetMooncake().installApp(std::make_unique<AppSetup>());
+        // PET (AppTouchDemo) is no longer installed: expressions live in the
+        // avatar skin, and the touch demo is kept only as source for later
+        // body-interaction experiments.
 
         // Main loop
         while (1) {
@@ -49,6 +52,8 @@ extern "C" void app_main(void)
             GetHAL().updateHeapStatusLog();
 
             GetMooncake().update();
+
+
 
             if (GetHAL().isXiaozhiStartRequested()) {
                 break;

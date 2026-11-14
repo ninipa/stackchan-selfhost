@@ -1,0 +1,23 @@
+# 开发覆盖：源码挂载 + --reload，配合 tools/deploy-mini.sh 的 rsync。
+#
+# 生产用户只用 docker-compose.yml；作者自己的 mini 用这个覆盖：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# 覆盖后 app/tools 从宿主机挂载，改代码几秒生效；生产镜像里的副本不再使用。
+services:
+  chan-behavior:
+    volumes:
+      - ./app:/app/app
+      - ./tools:/app/tools
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8100"
+      - --ws-ping-interval
+      - "3600"
+      - --ws-ping-timeout
+      - "60"
+      - --reload

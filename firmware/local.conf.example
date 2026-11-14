@@ -1,0 +1,8 @@
+# 本机设备配置（复制成 local.conf；已 gitignore）
+# 只需要填这两个值；configure.sh 会派生 OTA / behavior / teleop 三条 URL。
+
+# 设备访问这台服务器的局域网地址（IP 或主机名，不带 http://、不带端口）
+CHAN_SERVER_HOST=192.168.1.20
+
+# 与 selfhost/deploy.env 的 DEVICE_TOKEN 一致（openssl rand -hex 32）
+CHAN_DEVICE_TOKEN=__REPLACE_WITH_openssl_rand_hex_32__

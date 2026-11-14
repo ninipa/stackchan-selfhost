@@ -15,13 +15,19 @@
 #include <lvgl.h>
 #include <lvgl_theme.h>
 #include <stackchan/stackchan.h>
+#include <stackchan/avatar/decorators/decorators.h>
 #include <assets/lang_config.h>
 #include <hal/hal.h>
+#include "hal/behavior/behavior_runtime.h"
+#include "hal/behavior/pose.h"
 
 using namespace stackchan;
 using namespace stackchan::avatar;
 
 #define TAG "StackChanAvatarDisplay"
+
+LV_IMAGE_DECLARE(decorator_question);
+LV_IMAGE_DECLARE(decorator_exclam);
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
@@ -131,7 +137,10 @@ StackChanAvatarDisplay::StackChanAvatarDisplay(esp_lcd_panel_io_handle_t panel_i
         .io_handle      = panel_io_,
         .panel_handle   = panel_,
         .control_handle = nullptr,
-        .buffer_size    = static_cast<uint32_t>(width_ * 20),
+        // 20 行 = 12,800 字节，全部占内部 DMA RAM。播放语音时 DMA 最大连续块
+        // 会掉到 416 字节，Wi-Fi TX buffer（1,600 字节）分配失败 → TCP ACK 发不出去
+        // → 声音断断续续。降到 10 行（6,400 字节）让出 6.4KB。
+        .buffer_size    = static_cast<uint32_t>(width_ * 10),
         .double_buffer  = false,
         .trans_size     = 0,
         .hres           = static_cast<uint32_t>(width_),
@@ -253,20 +262,18 @@ void StackChanAvatarDisplay::SetupUI()
 
     auto avatar = std::make_unique<DefaultAvatar>();
     avatar->init(lv_screen_active());
-    avatar->getPanel()->onClick().connect([]() {
-        static uint32_t last_toggle_tick = 0;
-        const uint32_t now               = GetHAL().millis();
-        if (last_toggle_tick != 0 && now - last_toggle_tick < 2000) {
-            return;
-        }
 
-        if (hal_bridge::is_xiaozhi_ready()) {
-            last_toggle_tick = now;
-            hal_bridge::toggle_xiaozhi_chat_state();
-        }
-    });
+    // 2026-11-08：点击/长按改由 Hal::lvgl_read_cb 在 indev 层判定。
+    // 这里原先的 panel->onClick() + 2s 防抖，实测会吞掉"进入 listen 后立刻再点退出"；
+    // 而 LVGL 的 CLICKED 本身也不可靠（同坐标两次点按，有一次不出事件）。
+    // 详见 hal.cpp 里 kTouchLongPressMs 的注释。
 
     stackchan.attachAvatar(std::move(avatar));
+
+    // 新头像没有任何装饰器，旧的 id 已经失效
+    emotion_decorator_ids_.clear();
+    emotion_decorator_key_ = -1;
+
     stackchan.addModifier(std::make_unique<BreathModifier>());
     blink_modifier_id_ = stackchan.addModifier(std::make_unique<BlinkModifier>());
     stackchan.addModifier(std::make_unique<HeadPetModifier>());
@@ -281,8 +288,7 @@ void StackChanAvatarDisplay::SetupUI()
 
     auto config        = hal_bridge::get_xiaozhi_config();
     idle_motion_level_ = config.idleRandomMovementLevel;
-
-    ESP_LOGI(TAG, "Avatar created and started");
+    ESP_LOGI(TAG, "Avatar created: idle_motion_level=%d (0=Off)", static_cast<int>(idle_motion_level_));
 }
 
 void StackChanAvatarDisplay::LvglLock()
@@ -300,6 +306,7 @@ void StackChanAvatarDisplay::LvglUnlock()
 void StackChanAvatarDisplay::CreateIdleMotionModifier()
 {
     auto& stackchan = GetStackChan();
+    ESP_LOGI(TAG, "CreateIdleMotionModifier: level=%d (0=Off)", static_cast<int>(idle_motion_level_));
 
     switch (idle_motion_level_) {
         case 0:
@@ -318,38 +325,85 @@ void StackChanAvatarDisplay::CreateIdleMotionModifier()
     }
 }
 
+namespace {
+struct EmotionName
+{
+    const char* name;
+    Emotion emotion;
+};
+
+// 服务端 core/utils/textUtils.py 的 EMOJI_MAP 一共 21 个情绪串，
+// 外加协议/旧固件用过的别名，全部在这里落地，避免落到 Neutral。
+// 新增情绪串时两边要一起改（服务端白名单见 prompt_manager.py 的 EMOJI_List）。
+constexpr EmotionName kEmotionNames[] = {
+    {"neutral", Emotion::Neutral},
+    {"relaxed", Emotion::Neutral},
+    {"happy", Emotion::Happy},
+    {"loving", Emotion::Happy},
+    {"winking", Emotion::Happy},
+    {"kissy", Emotion::Happy},
+    {"confident", Emotion::Happy},
+    {"cool", Emotion::Happy},
+    {"delicious", Emotion::Happy},
+    {"laughing", Emotion::Laugh},
+    {"funny", Emotion::Laugh},
+    {"silly", Emotion::Laugh},
+    {"surprised", Emotion::Surprised},
+    {"surprise", Emotion::Surprised},
+    {"shocked", Emotion::Surprised},
+    {"embarrassed", Emotion::Surprised},
+    {"angry", Emotion::Angry},
+    {"sad", Emotion::Sad},
+    {"crying", Emotion::Sad},
+    {"sleepy", Emotion::Sleepy},
+    {"thinking", Emotion::Doubt},
+    {"confused", Emotion::Doubt},
+    {"doubtful", Emotion::Doubt},
+    {"dizzy", Emotion::Dizzy},
+};
+
+bool TryMapEmotionName(const char* name, Emotion& mapped)
+{
+    for (const auto& entry : kEmotionNames) {
+        if (strcmp(name, entry.name) == 0) {
+            mapped = entry.emotion;
+            return true;
+        }
+    }
+    return false;
+}
+}  // namespace
+
 void StackChanAvatarDisplay::SetEmotion(const char* emotion)
 {
     auto& stackchan = GetStackChan();
 
     if (!stackchan.hasAvatar() || !emotion) {
+        // 设了但没画出来：这类"日志里没有出现"的情况也要留痕，
+        // 否则排查时只会看到"我明明设过表情，屏幕上却没变"。
+        ESP_LOGW(TAG, "SetEmotion(%s) ignored: %s", emotion ? emotion : "null",
+                 stackchan.hasAvatar() ? "null name" : "no avatar");
         return;
     }
 
     DisplayLockGuard lock(this);
 
-    // ESP_LOGE(TAG, "SetEmotion: %s", emotion);
-
     auto& avatar = stackchan.avatar();
 
-    // Map emotion string to stackchan::Emotion
-    if (strcmp(emotion, "neutral") == 0) {
-        avatar.setEmotion(Emotion::Neutral);
-    } else if (strcmp(emotion, "happy") == 0) {
-        avatar.setEmotion(Emotion::Happy);
-    } else if (strcmp(emotion, "laughing") == 0) {
-        avatar.setEmotion(Emotion::Happy);
-    } else if (strcmp(emotion, "angry") == 0) {
-        avatar.setEmotion(Emotion::Angry);
-    } else if (strcmp(emotion, "sad") == 0) {
-        avatar.setEmotion(Emotion::Sad);
-    } else if (strcmp(emotion, "crying") == 0) {
-        avatar.setEmotion(Emotion::Sad);
-    } else if (strcmp(emotion, "sleepy") == 0) {
-        avatar.setEmotion(Emotion::Sleepy);
-        avatar.setSpeech("Zzz…");
+    // 情绪一变就离开睡眠态。否则 is_sleeping_ 一旦置位会永远为真，
+    // 之后每次 SetStatus 都会把屏幕文字清空。
+    const bool was_sleeping = is_sleeping_;
+    is_sleeping_ = false;
+
+    Emotion mapped = Emotion::Neutral;
+    if (!TryMapEmotionName(emotion, mapped)) {
+        ESP_LOGW(TAG, "Unknown emotion: %s, using NEUTRAL", emotion);
+    }
+    ESP_LOGI(TAG, "SetEmotion: %s -> %d", emotion, static_cast<int>(mapped));
+
+    if (mapped == Emotion::Sleepy) {
         is_sleeping_ = true;
-        // avatar.mouth().setWeight(10);
+        // Zzz 现在由 ZzzDecorator 画，不再占用对话气泡（气泡会覆盖聊天内容）
 
         // Stop idle motion
         ESP_LOGW(TAG, "Stop idle motion");
@@ -363,18 +417,75 @@ void StackChanAvatarDisplay::SetEmotion(const char* emotion)
         // Return to default pose
         auto& motion = GetStackChan().motion();
         motion.pitchServo().moveWithSpeed(0, 80);
+    }
 
-    } else if (strcmp(emotion, "doubtful") == 0) {
-        avatar.setEmotion(Emotion::Doubt);
-    } else {
-        ESP_LOGW(TAG, "Unknown emotion: %s, using NEUTRAL", emotion);
-        avatar.setEmotion(Emotion::Neutral);
+    avatar.setEmotion(mapped);
+    UpdateEmotionDecorators(mapped);
+
+    // 从困态醒来：困脸会把头压到底（pitch 0 → 夹到 3°），离开困态时没人抬它，
+    // 结果就是"睡醒后一直低着头"。这里补一次回常态位。
+    if (was_sleeping && mapped != Emotion::Sleepy) {
+        ESP_LOGI(TAG, "wake from sleepy, pose back to %d", chan_pose::kPitchHome);
+        stackchan.motion().moveWithSpeed(0, chan_pose::kPitchHome, 300);
     }
 
     // Resync blink modifier base eye weights
     auto blink_modifier = static_cast<BlinkModifier*>(stackchan.getModifier(blink_modifier_id_));
     if (blink_modifier) {
         blink_modifier->resyncEyeWeights();
+    }
+}
+
+// 情绪配饰：生气→青筋、难过→眼泪、疑惑→问号、惊讶→感叹号、
+// 开心/大笑→爱心、困→Zzz。其他情绪一律收掉。
+// 只在情绪真正变化时才重建，否则每次 SetEmotion 都会重播一遍弹出/出现动画。
+void StackChanAvatarDisplay::UpdateEmotionDecorators(Emotion emotion)
+{
+    auto& avatar  = GetStackChan().avatar();
+    const int key = static_cast<int>(emotion);
+
+    // 装饰器可能被 clearDecorators()（例如配网流程）清掉，id 还在但对象没了
+    if (!emotion_decorator_ids_.empty() && avatar.getDecorator(emotion_decorator_ids_.front()) == nullptr) {
+        emotion_decorator_ids_.clear();
+        emotion_decorator_key_ = -1;
+    }
+
+    if (key == emotion_decorator_key_) {
+        return;
+    }
+
+    for (int id : emotion_decorator_ids_) {
+        avatar.removeDecorator(id);
+    }
+    emotion_decorator_ids_.clear();
+    emotion_decorator_key_ = key;
+
+    auto add = [&](std::unique_ptr<Decorator> decorator) {
+        emotion_decorator_ids_.push_back(avatar.addDecorator(std::move(decorator)));
+    };
+
+    switch (emotion) {
+        case Emotion::Angry:
+            add(std::make_unique<AngryDecorator>(lv_screen_active(), 0));
+            break;
+        case Emotion::Sad:
+            add(std::make_unique<TearDecorator>(lv_screen_active(), 0));
+            break;
+        case Emotion::Doubt:
+            add(std::make_unique<SymbolDecorator>(lv_screen_active(), &decorator_question));
+            break;
+        case Emotion::Surprised:
+            add(std::make_unique<SymbolDecorator>(lv_screen_active(), &decorator_exclam));
+            break;
+        case Emotion::Happy:
+        case Emotion::Laugh:
+            add(std::make_unique<HeartDecorator>(lv_screen_active(), 0, 500));
+            break;
+        case Emotion::Sleepy:
+            add(std::make_unique<ZzzDecorator>(lv_screen_active(), 0));
+            break;
+        default:
+            break;
     }
 }
 
@@ -503,6 +614,15 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
             speaking_modifier_id_ = -1;
         }
 
+        // TTS 结束后进入聆听，清掉上一轮的气泡。
+        // 气泡是 LV_LABEL_LONG_MODE_SCROLL_CIRCULAR，只要可见就会一直循环滚动；
+        // 自动对话模式又不会回到 idle，所以必须在这里清。
+        avatar.clearSpeech();
+
+        // 进入聆听 = 用户要说话，行为表演让位给语音
+        behavior_runtime_on_voice_activity();
+
+        // 聆听：单颗 LED 0（用户实验：光会从壳体扩散，单颗即可）
         GetHAL().setRgbColor(0, 0, 50, 0);
         GetHAL().refreshRgb();
 
@@ -518,6 +638,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
         is_idle = true;
 
+        // 待机：单颗 LED 0 熄灭（遥控紫灯会在语音结束后由 teleop 恢复）
         GetHAL().setRgbColor(0, 0, 0, 0);
         GetHAL().refreshRgb();
 
@@ -526,6 +647,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
             speaking_modifier_id_ = stackchan.addModifier(std::make_unique<SpeakingModifier>(0, 180, false));
         }
 
+        // 说话：单颗 LED 0 蓝色
         GetHAL().setRgbColor(0, 0, 0, 50);
         GetHAL().refreshRgb();
     } else {
@@ -534,7 +656,7 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
     if (is_idle) {
         // Start idle motion
-        ESP_LOGW(TAG, "Start idle motion");
+        ESP_LOGW(TAG, "Start idle (level=%d, 0=Off)", static_cast<int>(idle_motion_level_));
         if (idle_motion_modifier_id_ < 0) {
             if (idle_motion_level_ > 0) {
                 CreateIdleMotionModifier();

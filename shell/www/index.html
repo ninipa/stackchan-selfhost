@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StackChan</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #F5F0E7; color: #211D17; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; justify-content: center;
+  }
+  .wrap { width: 100%; max-width: 520px; padding: 28px 24px 36px; }
+  .face { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 8px 0 18px; }
+  .eyes { display: flex; gap: 22px; }
+  .eye { width: 20px; height: 30px; border-radius: 10px; background: #2F8C72; }
+  .mouth { width: 20px; height: 9px; border-bottom: 3px solid #2F8C72; border-radius: 0 0 10px 10px; }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: .01em; }
+  .sub { margin: 0 0 22px; color: #7C7261; font-size: 13px; line-height: 1.6; }
+  label { display: block; margin: 14px 0 6px; font-size: 13px; font-weight: 600; }
+  input {
+    width: 100%; padding: 13px 14px; border: 1px solid #E6DFD2; border-radius: 14px;
+    background: #FFFDF8; color: #211D17; font-size: 15px; outline: none;
+  }
+  input:focus { border-color: #C4552F; }
+  .row { display: flex; gap: 10px; margin-top: 20px; }
+  button {
+    flex: 1; border: 0; border-radius: 14px; padding: 13px 14px; font-size: 15px;
+    font-weight: 600; cursor: pointer;
+  }
+  button.primary { background: #C4552F; color: #fff; }
+  button.ghost { background: #FFFDF8; color: #211D17; border: 1px solid #E6DFD2; }
+  button.link {
+    flex: none; width: 100%; margin-top: 18px; background: transparent;
+    color: #7C7261; font-size: 12px; font-weight: 400; text-decoration: underline;
+  }
+  .status { min-height: 20px; margin: 14px 0 0; font-size: 13px; color: #7C7261; }
+  .status.ok { color: #2F7A43; }
+  .status.bad { color: #B3261E; }
+  .hint { margin: 18px 0 0; color: #7C7261; font-size: 12px; line-height: 1.6; }
+  code { background: #EFE9DC; border-radius: 5px; padding: 1px 5px; }
+  #boot {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 12px;
+    background: #F5F0E7; color: #7C7261; font-size: 14px;
+  }
+  #boot .spinner {
+    width: 24px; height: 24px; border: 3px solid #E6DFD2; border-top-color: #C4552F;
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div id="boot"><div class="spinner"></div><div>正在连接 StackChan…</div></div>
+  <div class="wrap">
+    <div class="face">
+      <div class="eyes"><i class="eye"></i><i class="eye"></i></div>
+      <div class="mouth"></div>
+    </div>
+    <h1>连接 StackChan</h1>
+    <p class="sub">第一次启动需要填服务器地址和 App Token；之后会记住。</p>
+
+    <label for="base">服务器地址</label>
+    <input id="base" type="url" inputmode="url" autocapitalize="off" spellcheck="false"
+           placeholder="http://192.168.1.20:8100 或 https://xxx.ts.net">
+
+    <label for="token">App Token</label>
+    <input id="token" type="password" autocapitalize="off" spellcheck="false"
+           placeholder="粘贴 App Token">
+
+    <div class="row">
+      <button id="test" class="ghost" type="button">测试连接</button>
+      <button id="open" class="primary" type="button">打开</button>
+    </div>
+    <p id="status" class="status"></p>
+
+    <p class="hint">
+      地址要和固件的 <code>CHAN_SERVER_HOST</code> 一致；Token 在服务器
+      <code>selfhost/behavior/.env</code> 的 <code>APP_TOKEN</code>。
+      用 Tailscale 时填 <code>https://&lt;machine&gt;.ts.net</code>。
+    </p>
+    <button id="reset" class="link" type="button">清除已保存配置</button>
+  </div>
+
+<script>
+  const BRIDGE = window.ChanSetup;
+  const LS = 'chan_shell_cfg';
+  const $ = (id) => document.getElementById(id);
+
+  function normalize(s) { return (s || '').trim().replace(/\/+$/, ''); }
+
+  function loadCfg() {
+    if (BRIDGE && BRIDGE.getConfig) {
+      try {
+        const cfg = JSON.parse(BRIDGE.getConfig());
+        if (cfg && cfg.base) return cfg;
+      } catch (e) { /* fall through */ }
+    }
+    try { return JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { return null; }
+  }
+  function saveCfg(cfg) {
+    if (BRIDGE && BRIDGE.save) BRIDGE.save(cfg.base, cfg.token);
+    localStorage.setItem(LS, JSON.stringify(cfg));
+  }
+  function clearCfg() {
+    if (BRIDGE && BRIDGE.clear) BRIDGE.clear();
+    localStorage.removeItem(LS);
+  }
+  function b64url(text) {
+    const bytes = new TextEncoder().encode(text);
+    let bin = '';
+    bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function openApp(cfg) {
+    location.replace(cfg.base + '/app#cfg=' + b64url(JSON.stringify(cfg)));
+  }
+  function setStatus(text, kind) {
+    $('status').textContent = text || '';
+    $('status').className = 'status' + (kind ? ' ' + kind : '');
+  }
+  async function check(base, token) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 4500);
+    try {
+      const health = await fetch(base + '/health', { cache: 'no-store', signal: ac.signal });
+      if (!health.ok) return '服务返回 HTTP ' + health.status;
+      const res = await fetch(base + '/api/devices', {
+        headers: { 'X-App-Token': token }, cache: 'no-store', signal: ac.signal,
+      });
+      if (res.status === 401) return 'App Token 不正确';
+      if (!res.ok) return '接口返回 HTTP ' + res.status;
+      return null;
+    } catch (e) {
+      return e.name === 'AbortError' ? '连接超时' : '连不上：' + e.message;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  function formCfg() {
+    const base = normalize($('base').value);
+    const token = $('token').value.trim();
+    if (!/^https?:\/\//.test(base)) {
+      setStatus('地址必须以 http:// 或 https:// 开头', 'bad');
+      return null;
+    }
+    if (!token) {
+      setStatus('请填 App Token', 'bad');
+      return null;
+    }
+    return { base, token };
+  }
+
+  $('test').addEventListener('click', async () => {
+    const cfg = formCfg();
+    if (!cfg) return;
+    setStatus('测试中…');
+    const err = await check(cfg.base, cfg.token);
+    setStatus(err || '连接成功', err ? 'bad' : 'ok');
+  });
+
+  $('open').addEventListener('click', async () => {
+    const cfg = formCfg();
+    if (!cfg) return;
+    setStatus('校验中…');
+    const err = await check(cfg.base, cfg.token);
+    if (err) { setStatus(err, 'bad'); return; }
+    saveCfg(cfg);
+    openApp(cfg);
+  });
+
+  $('reset').addEventListener('click', () => {
+    clearCfg();
+    $('base').value = '';
+    $('token').value = '';
+    setStatus('已清除，请重新填写');
+  });
+
+  const existing = loadCfg();
+  const forceSetup = new URLSearchParams(location.search).get('setup') === '1';
+  if (existing && existing.base && existing.token && !forceSetup) {
+    // 保留连接遮罩，避免已配置用户每次启动先闪一下地址表单。
+    openApp(existing);
+  } else {
+    $('boot').style.display = 'none';
+    if (existing) {
+      $('base').value = existing.base || '';
+      $('token').value = existing.token || '';
+    }
+  }
+</script>
+</body>
+</html>

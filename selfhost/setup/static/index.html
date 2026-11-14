@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StackChan 服务端配置</title>
+<style>
+  :root { color-scheme: light; --ink:#211D17; --muted:#7C7261; --cream:#F5F0E7;
+    --card:#FFFDF8; --line:#E6DFD2; --coral:#C4552F; --green:#2F7A43; --red:#B3261E; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--cream); color:var(--ink); }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 22px 18px 60px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+  h1 { margin:0; font-size:20px; }
+  .sub { color:var(--muted); font-size:12px; line-height:1.6; }
+  .badge { font-size:11px; padding:4px 8px; border-radius:999px; background:#EFE9DC; color:var(--muted); }
+  .badge.warn { background:#FBE9D9; color:#8A3B12; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin:12px 0; }
+  .card h2 { margin:0 0 4px; font-size:15px; }
+  .card .hint { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.6; }
+  label { display:block; margin:12px 0 6px; font-size:12px; font-weight:600; color:#3E382E; }
+  label:first-of-type { margin-top:0; }
+  input, select, textarea {
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:12px;
+    background:#fff; color:var(--ink); font-size:14px; outline:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--coral); }
+  textarea { min-height:160px; resize:vertical; line-height:1.6; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  @media (max-width:640px) { .grid2,.grid3 { grid-template-columns:1fr; } }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  button { border:0; border-radius:12px; padding:11px 14px; font-size:14px; font-weight:600; cursor:pointer; }
+  button.primary { background:var(--coral); color:#fff; }
+  button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  button.small { padding:7px 10px; font-size:12px; font-weight:500; }
+  button:disabled { opacity:.55; cursor:default; }
+  .msg { min-height:20px; margin-top:12px; font-size:13px; color:var(--muted); }
+  .msg.ok { color:var(--green); }
+  .msg.bad { color:var(--red); }
+  .kv { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+  .kv:last-child { border-bottom:0; }
+  .kv code { word-break:break-all; }
+  pre { margin:10px 0 0; padding:12px; background:#15130F; color:#E8E2D6; border-radius:12px;
+    font-size:11px; line-height:1.5; max-height:260px; overflow:auto; white-space:pre-wrap; }
+  .gate { position:fixed; inset:0; background:rgba(245,240,231,.96); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .gate[hidden] { display:none; }
+  .gate .box { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line);
+    border-radius:20px; padding:22px; }
+  .gate h2 { margin:0 0 6px; font-size:18px; }
+  .copy { font-size:12px; color:var(--coral); background:none; border:0; padding:0; cursor:pointer; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .tag { display:inline-block; font-size:11px; color:var(--muted); background:#EFE9DC; border-radius:6px; padding:2px 6px; }
+  a { color:var(--coral); }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate" hidden>
+  <div class="box">
+    <h2>StackChan 配置</h2>
+    <p class="sub">输入这台服务器的 <code>ADMIN_TOKEN</code>。它在
+      <code>selfhost/data/setup-admin.token</code>，首次启动时也会打印在控制台。</p>
+    <label for="gateToken">Admin Token</label>
+    <input id="gateToken" type="password" autocomplete="off" placeholder="粘贴 admin token">
+    <div class="row"><button class="primary" id="gateBtn" type="button">进入</button></div>
+    <p class="msg bad" id="gateMsg"></p>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>StackChan 服务端配置</h1>
+      <div class="sub">写 <code>deploy.env</code> → render → 重启容器；失败自动回滚。</div>
+    </div>
+    <span class="badge" id="dryBadge" hidden>dry-run：只写文件，不重启</span>
+  </header>
+
+  <div class="card">
+    <h2>连接</h2>
+    <p class="hint">DEVICE_HOST 是设备能访问到的局域网地址；PUBLIC_BASE_URL 是手机能访问到的地址（Tailscale HTTPS 或 LAN）。</p>
+    <div class="grid2">
+      <div><label for="device_host">DEVICE_HOST</label>
+        <input id="device_host" placeholder="192.168.1.20"></div>
+      <div><label for="public_base_url">PUBLIC_BASE_URL</label>
+        <input id="public_base_url" placeholder="https://xxx.ts.net"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>LLM</h2>
+    <p class="hint">只支持 OpenAI <b>Chat Completions</b> 兼容端点（URL 必须以 <code>/chat/completions</code> 结尾）；
+      Responses / Anthropic Messages / Gemini 需要另加 provider 适配。</p>
+    <div class="grid2">
+      <div><label for="llm_base_url">API URL（完整）</label>
+        <input id="llm_base_url" placeholder="https://api.deepseek.com/v1/chat/completions"></div>
+      <div><label for="llm_model">Model ID</label>
+        <input id="llm_model" list="model_ids" placeholder="deepseek-flash"></div>
+    </div>
+    <datalist id="model_ids">
+      <option value="deepseek-flash">DeepSeek Flash（官方当前，便宜快）</option>
+      <option value="deepseek-v4-pro">DeepSeek V4 Pro（官方当前）</option>
+      <option value="deepseek-chat">deepseek-chat（旧兼容别名）</option>
+      <option value="gpt-4o-mini">OpenAI gpt-4o-mini</option>
+      <option value="qwen-plus">Qwen Plus</option>
+    </datalist>
+    <p class="hint">Model 填供应商文档里的模型 ID（不是显示名）。DeepSeek 当前官方 ID 是
+      <code>deepseek-flash</code> / <code>deepseek-v4-pro</code>；<code>deepseek-chat</code> 是旧别名。</p>
+    <div class="grid3">
+      <div><label for="llm_temperature">Temperature</label>
+        <input id="llm_temperature" placeholder="0.7"></div>
+      <div><label for="llm_max_tokens">Max tokens</label>
+        <input id="llm_max_tokens" placeholder="500"></div>
+      <div><label for="llm_api_key">API Key</label>
+        <input id="llm_api_key" type="password" autocomplete="off" placeholder="留空不改"></div>
+    </div>
+    <div class="row"><button class="ghost" id="testLlm" type="button">测试 LLM</button></div>
+    <div class="msg" id="llmMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>天气（可选）</h2>
+    <p class="hint">建议注册和风天气（免费开发版）：
+      <a href="https://console.qweather.com/" target="_blank" rel="noreferrer">console.qweather.com</a>。
+      在控制台创建项目后，填它给的 API Host 和 Key；没有 key 就留空，插件会返回不可用，不影响对话。</p>
+    <div class="grid2">
+      <div><label for="qweather_api_host">API Host</label>
+        <input id="qweather_api_host" placeholder="xxx.re.qweatherapi.com"></div>
+      <div><label for="qweather_api_key">API Key</label>
+        <input id="qweather_api_key" type="password" autocomplete="off" placeholder="留空不改"></div>
+    </div>
+    <label for="default_city">默认城市</label>
+    <input id="default_city" placeholder="北京">
+    <div class="row"><button class="ghost" id="testWeather" type="button">测试天气</button></div>
+    <div class="msg" id="weatherMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>时区</h2>
+    <p class="hint">默认按服务器系统时区自动识别；可直接下拉改。保存时 TZ_OFFSET 自动推导。</p>
+    <label for="tz">TZ</label>
+    <select id="tz"></select>
+  </div>
+
+  <div class="card">
+    <h2>记忆功能</h2>
+    <p class="hint">默认关闭。开启后会在 <code>data/memory.json</code> 记录对话摘要，供后续会话参考。</p>
+    <label for="memory">Memory</label>
+    <select id="memory">
+      <option value="nomem">关闭（nomem）</option>
+      <option value="mem_core">开启（mem_core）</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>人设</h2>
+    <p class="hint">写进 <code>templates/persona.txt</code>，保存后 render 到 <code>prompt:</code>。</p>
+    <textarea id="persona" placeholder="你是小智……"></textarea>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="save" type="button">保存并重启</button>
+    <button class="ghost" id="refreshStatus" type="button">刷新状态</button>
+    <button class="ghost" id="testOta" type="button">测试 OTA</button>
+  </div>
+  <div class="msg" id="saveMsg"></div>
+  <div class="msg" id="otaMsg"></div>
+
+  <div class="card">
+    <h2>容器</h2>
+    <div id="containers" class="sub">读取中…</div>
+    <div class="row">
+      <button class="ghost small" id="logsX" type="button">xiaozhi 日志</button>
+      <button class="ghost small" id="logsB" type="button">behavior 日志</button>
+    </div>
+    <pre id="logs" hidden></pre>
+  </div>
+
+  <div class="card">
+    <h2>固件配置</h2>
+    <p class="hint">由服务端自动生成，不需要手填；复制到 <code>firmware/local.conf</code> 后编译/刷写。
+      改 DEVICE_TOKEN 需要重编固件（首次保存会自动生成）。</p>
+    <div class="kv"><span>CHAN_SERVER_HOST</span><span><code id="fwHost" class="mono"></code>
+      <button class="copy" id="copyFwHost" type="button">复制</button></span></div>
+    <div class="kv"><span>CHAN_DEVICE_TOKEN</span><span><code id="fwToken" class="mono"></code>
+      <button class="copy" id="copyFwToken" type="button">复制</button></span></div>
+  </div>
+
+  <div class="card">
+    <h2>App 配对</h2>
+    <p class="hint">由服务端自动生成，不需要手填；App 首次启动填这两项，不要发到公开群。
+      首次保存会自动生成 App Token。</p>
+    <div class="kv"><span>服务器地址</span><span><code id="pairBase" class="mono"></code>
+      <button class="copy" id="copyPairBase" type="button">复制</button></span></div>
+    <div class="kv"><span>App Token</span><span><code id="pairToken" class="mono"></code>
+      <button class="copy" id="copyPairToken" type="button">复制</button></span></div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let token = sessionStorage.getItem('setup_admin') || '';
+
+  function setMsg(id, text, kind) {
+    const el = $(id);
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+  function showGate(msg) {
+    $('gate').hidden = false;
+    $('gateMsg').textContent = msg || '';
+  }
+  function hideGate() { $('gate').hidden = true; }
+
+  async function api(path, opts = {}) {
+    const headers = Object.assign(
+      { 'X-Admin-Token': token },
+      opts.body ? { 'Content-Type': 'application/json' } : {},
+      opts.headers || {}
+    );
+    const res = await fetch('/api/' + path, Object.assign({}, opts, { headers }));
+    if (res.status === 401) {
+      token = '';
+      sessionStorage.removeItem('setup_admin');
+      showGate('Admin Token 不正确');
+      throw new Error('401');
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = body && body.detail;
+      let message;
+      if (typeof detail === 'string') message = detail;
+      else if (Array.isArray(detail)) message = detail.map((x) => x.msg || JSON.stringify(x)).join('; ');
+      else if (detail && typeof detail === 'object') message = JSON.stringify(detail);
+      else message = (body && body.message) || res.statusText;
+      throw new Error(message);
+    }
+    return body;
+  }
+
+  const TZ_LABELS = {
+    'Asia/Shanghai': '中国标准时间', 'Asia/Hong_Kong': '香港', 'Asia/Taipei': '台北',
+    'Asia/Tokyo': '日本', 'Asia/Seoul': '韩国', 'Asia/Singapore': '新加坡',
+    'Asia/Bangkok': '曼谷', 'Asia/Kolkata': '印度', 'Asia/Dubai': '迪拜',
+    'Europe/London': '伦敦', 'Europe/Paris': '巴黎', 'Europe/Berlin': '柏林',
+    'Europe/Moscow': '莫斯科', 'America/New_York': '纽约', 'America/Chicago': '芝加哥',
+    'America/Denver': '丹佛', 'America/Los_Angeles': '洛杉矶', 'America/Sao_Paulo': '圣保罗',
+    'Australia/Sydney': '悉尼', 'Pacific/Auckland': '奥克兰', 'UTC': 'UTC'
+  };
+  function populateTimezones(data, current) {
+    const sel = $('tz');
+    const zones = data.timezones || {};
+    const common = zones.common || [];
+    const all = zones.all || [];
+    const commonSet = new Set(common);
+    sel.innerHTML = '';
+    const addGroup = (label, list) => {
+      if (!list.length) return;
+      const group = document.createElement('optgroup');
+      group.label = label;
+      for (const zone of list) {
+        const option = document.createElement('option');
+        option.value = zone;
+        option.textContent = TZ_LABELS[zone] ? `${zone}（${TZ_LABELS[zone]}）` : zone;
+        group.appendChild(option);
+      }
+      sel.appendChild(group);
+    };
+    addGroup('常用', common);
+    const byRegion = new Map();
+    for (const zone of all) {
+      if (commonSet.has(zone)) continue;
+      const region = zone.includes('/') ? zone.split('/')[0] : '其他';
+      if (!byRegion.has(region)) byRegion.set(region, []);
+      byRegion.get(region).push(zone);
+    }
+    const order = ['Asia','Europe','America','Africa','Australia','Pacific','Atlantic','Indian','Arctic','Antarctica','Etc','其他'];
+    for (const region of order) {
+      if (byRegion.has(region)) addGroup(region, byRegion.get(region));
+    }
+    for (const [region, list] of byRegion) {
+      if (!order.includes(region)) addGroup(region, list);
+    }
+    if (current && ![...sel.options].some((option) => option.value === current)) {
+      const option = document.createElement('option');
+      option.value = current;
+      option.textContent = `${current}（当前配置）`;
+      sel.prepend(option);
+    }
+    sel.value = current || common[0] || 'UTC';
+  }
+
+  function fill(data) {
+    const v = data.values || {};
+    populateTimezones(data, v.TZ || '');
+    ['device_host','public_base_url','llm_base_url','llm_model',
+     'llm_temperature','llm_max_tokens','qweather_api_host','default_city','tz','memory'
+    ].forEach((key) => {
+      const el = $(key);
+      if (!el) return;
+      const map = { device_host:'DEVICE_HOST', public_base_url:'PUBLIC_BASE_URL',
+        llm_base_url:'LLM_BASE_URL', llm_model:'LLM_MODEL',
+        llm_temperature:'LLM_TEMPERATURE', llm_max_tokens:'LLM_MAX_TOKENS',
+        qweather_api_host:'QWEATHER_API_HOST', default_city:'DEFAULT_CITY',
+        tz:'TZ', memory:'MEMORY' };
+      const value = v[map[key]];
+      if (value !== undefined && value !== null) el.value = value;
+    });
+
+    const secrets = data.secrets || {};
+    const hints = data.secret_hints || {};
+    [['llm_api_key','LLM_API_KEY'], ['qweather_api_key','QWEATHER_API_KEY']
+    ].forEach(([id, key]) => {
+      const el = $(id);
+      el.value = '';
+      el.placeholder = secrets[key] ? `已配置 ${secrets[key]}，留空不改` : (hints[key] || '未配置');
+    });
+
+    $('persona').value = data.persona || '';
+    $('fwHost').textContent = (data.firmware && data.firmware.host) || '(未配置)';
+    $('fwToken').textContent = (data.firmware && data.firmware.token) || '(未配置)';
+    $('pairBase').textContent = (data.pairing && data.pairing.base) || '(未配置)';
+    $('pairToken').textContent = (data.pairing && data.pairing.token) || '(未配置)';
+    $('dryBadge').hidden = !data.dry_run;
+  }
+
+  async function load() {
+    try {
+      const session = await fetch('/api/session', { cache: 'no-store' }).then((r) => r.json());
+      if (session.admin_required && !token) { showGate(); return; }
+      const data = await api('config');
+      hideGate();
+      fill(data);
+    } catch (e) {
+      if (e.message !== '401') setMsg('saveMsg', e.message, 'bad');
+    }
+  }
+
+  function payload() {
+    const values = {
+      DEVICE_HOST: $('device_host').value.trim(),
+      PUBLIC_BASE_URL: $('public_base_url').value.trim(),
+      LLM_BASE_URL: $('llm_base_url').value.trim(),
+      LLM_MODEL: $('llm_model').value.trim(),
+      LLM_TEMPERATURE: $('llm_temperature').value.trim(),
+      LLM_MAX_TOKENS: $('llm_max_tokens').value.trim(),
+      QWEATHER_API_HOST: $('qweather_api_host').value.trim(),
+      DEFAULT_CITY: $('default_city').value.trim(),
+      TZ: $('tz').value.trim(),
+      MEMORY: $('memory').value,
+    };
+    const secrets = {};
+    [['llm_api_key','LLM_API_KEY'], ['qweather_api_key','QWEATHER_API_KEY']
+    ].forEach(([id, key]) => {
+      const v = $(id).value.trim();
+      if (v) secrets[key] = v;
+    });
+    return { values, secrets, persona: $('persona').value };
+  }
+
+  $('save').addEventListener('click', async () => {
+    const btn = $('save');
+    btn.disabled = true;
+    setMsg('saveMsg', '保存中…（可能 15–60 秒）');
+    try {
+      const result = await api('config', { method: 'POST', body: JSON.stringify(payload()) });
+      setMsg('saveMsg', result.message || '已保存并重启', 'ok');
+      await load();
+      await refreshStatus();
+    } catch (e) {
+      if (e.message !== '401') setMsg('saveMsg', e.message, 'bad');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('testLlm').addEventListener('click', async () => {
+    setMsg('llmMsg', '测试中…');
+    try {
+      const r = await api('test/llm', { method: 'POST', body: JSON.stringify({
+        base_url: $('llm_base_url').value.trim(),
+        model: $('llm_model').value.trim(),
+        api_key: $('llm_api_key').value.trim(),
+      }) });
+      setMsg('llmMsg', `OK · ${r.model} · ${r.reply || '(空回复)'}`, 'ok');
+    } catch (e) {
+      if (e.message !== '401') setMsg('llmMsg', e.message, 'bad');
+    }
+  });
+
+  $('testWeather').addEventListener('click', async () => {
+    setMsg('weatherMsg', '测试中…');
+    try {
+      const r = await api('test/weather', { method: 'POST', body: JSON.stringify({
+        api_host: $('qweather_api_host').value.trim(),
+        api_key: $('qweather_api_key').value.trim(),
+        city: $('default_city').value.trim(),
+      }) });
+      setMsg('weatherMsg', `OK · ${r.city} · ${r.text} ${r.temp}°`, 'ok');
+    } catch (e) {
+      if (e.message !== '401') setMsg('weatherMsg', e.message, 'bad');
+    }
+  });
+
+  $('testOta').addEventListener('click', async () => {
+    setMsg('otaMsg', '测试中…');
+    try {
+      const r = await api('test/ota', { method: 'POST', body: JSON.stringify({
+        host: $('device_host').value.trim(),
+      }) });
+      setMsg('otaMsg', `OK · ${r.websocket}`, 'ok');
+    } catch (e) {
+      if (e.message !== '401') setMsg('otaMsg', e.message, 'bad');
+    }
+  });
+
+  async function refreshStatus() {
+    try {
+      const r = await api('status');
+      const rows = (r.containers || []).map((c) =>
+        `<div class="kv"><span>${c.name}</span><span>${c.status}</span></div>`).join('');
+      $('containers').innerHTML = rows || '<span class="sub">无容器 / dry-run</span>';
+      const h = r.health || {};
+      $('containers').innerHTML += `<div class="kv"><span>health</span><span class="mono">${
+        JSON.stringify(h).slice(0, 220)}</span></div>`;
+    } catch (e) {
+      if (e.message !== '401') $('containers').textContent = e.message;
+    }
+  }
+
+  async function showLogs(service) {
+    $('logs').hidden = false;
+    $('logs').textContent = '读取中…';
+    try {
+      const r = await api('logs?service=' + service);
+      $('logs').textContent = r.text || '(空)';
+    } catch (e) {
+      if (e.message !== '401') $('logs').textContent = e.message;
+    }
+  }
+  $('logsX').addEventListener('click', () => showLogs('xiaozhi'));
+  $('logsB').addEventListener('click', () => showLogs('behavior'));
+  $('refreshStatus').addEventListener('click', refreshStatus);
+
+  function copy(id) {
+    const text = $(id).textContent;
+    if (!text || text === '(未配置)') return;
+    navigator.clipboard.writeText(text).then(() => setMsg('saveMsg', '已复制', 'ok'));
+  }
+  $('copyFwHost').addEventListener('click', () => copy('fwHost'));
+  $('copyFwToken').addEventListener('click', () => copy('fwToken'));
+  $('copyPairBase').addEventListener('click', () => copy('pairBase'));
+  $('copyPairToken').addEventListener('click', () => copy('pairToken'));
+
+  $('gateBtn').addEventListener('click', async () => {
+    token = $('gateToken').value.trim();
+    if (!token) return;
+    sessionStorage.setItem('setup_admin', token);
+    try {
+      const data = await api('config');
+      hideGate();
+      fill(data);
+    } catch (e) {
+      if (e.message !== '401') $('gateMsg').textContent = e.message;
+    }
+  });
+  $('gateToken').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') $('gateBtn').click();
+  });
+
+  load();
+  refreshStatus();
+</script>
+</body>
+</html>

@@ -10,10 +10,13 @@ namespace stackchan::avatar {
 enum class Emotion {
     Neutral = 0,
     Happy,
+    Laugh,
     Angry,
     Sad,
     Doubt,
     Sleepy,
+    Surprised,
+    Dizzy,
 };
 
 }  // namespace stackchan::avatar

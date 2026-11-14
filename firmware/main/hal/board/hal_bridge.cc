@@ -11,6 +11,7 @@
 #include <nvs_flash.h>
 #include <driver/gpio.h>
 #include <esp_event.h>
+#include <esp_timer.h>
 #include <application.h>
 #include <board.h>
 #include <display.h>
@@ -53,7 +54,30 @@ Data_t& get_data()
 void set_touch_point(int num, int x, int y)
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    _data.touchPoint.num = num;
+
+    if (num > 0) {
+        _data.touchPoint.num = num;
+        _data.touchPoint.x   = x;
+        _data.touchPoint.y   = y;
+        // 记下"这次按下还没被 LVGL 读走"
+        _data.touchPressLatched = true;
+        _data.touchPressUs      = esp_timer_get_time();
+        return;
+    }
+
+    // 松开：如果这次按下还没被 LVGL 读到，就先维持按下状态。
+    // 否则一段 30~50ms 的轻点会整个落在两次 indev 读取之间，表现为"点了没反应"。
+    // 150ms 是安全上限：LVGL 若因故没在读（启动早期/被阻塞），不能永远卡在按下。
+    if (_data.touchPressLatched) {
+        if (esp_timer_get_time() - _data.touchPressUs < 150 * 1000) {
+            _data.touchPoint.num = 1;
+            return;
+        }
+        _data.touchPressLatched = false;
+        ESP_LOGW(_tag, "[TP] press latch expired without lvgl read");
+    }
+
+    _data.touchPoint.num = 0;
     _data.touchPoint.x   = x;
     _data.touchPoint.y   = y;
 }

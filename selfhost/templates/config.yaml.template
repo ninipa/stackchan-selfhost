@@ -1,0 +1,101 @@
+# StackChan 服务端配置（由 render.py 生成，不要手改）
+# 源：selfhost/templates/config.yaml.template + selfhost/deploy.env
+# 手改会在下次 render 时被覆盖。
+
+server:
+  ip: 0.0.0.0
+  port: 8000
+  http_port: 8003
+  # 设备访问的地址；由 DEVICE_HOST 派生
+  websocket: ws://${DEVICE_HOST}:8000/xiaozhi/v1/
+  vision_explain: http://${DEVICE_HOST}:8003/mcp/vision/explain
+  timezone_offset: ${TZ_OFFSET}
+  auth:
+    enabled: ${AUTH_ENABLED}
+    allowed_devices: ${ALLOWED_DEVICES_YAML}
+
+log:
+  log_level: ${LOG_LEVEL}
+
+# 音频 / 调试
+delete_audio: true
+debug_opus_dump: false
+close_connection_no_voice_time: 60
+disable_device_mcp_tools: true
+
+# 人设
+prompt: |
+${PERSONA_INDENTED}
+
+# 系统提示词模板；render.py 会把 templates/agent-base-prompt.txt 复制到 data/
+prompt_template: /opt/xiaozhi-esp32-server/data/agent-base-prompt.txt
+
+system_error_response: "我这会儿有点走神，你再说一次好不好？"
+
+end_prompt:
+  enable: true
+  # 预生成音频 assets/end_prompt.wav；改文案要重新生成
+  text: "${END_PROMPT_TEXT}"
+  prompt: |
+    请你以"时间过得真快"为开头，用富有感情、依依不舍的话来结束这场对话吧！
+
+selected_module:
+  VAD: SileroVAD
+  ASR: FunASR
+  LLM: DeepSeekLLM
+  # VLLM 不覆盖，继承镜像默认；视觉问答需要自己配 key
+  TTS: EdgeTTS
+  Memory: ${MEMORY}
+  Intent: function_call
+
+VAD:
+  SileroVAD:
+    type: silero
+    threshold: 0.5
+    threshold_low: 0.3
+    model_dir: models/snakers4_silero-vad
+    min_silence_duration_ms: 200
+
+ASR:
+  FunASR:
+    type: fun_local
+    model_dir: models/SenseVoiceSmall
+    output_dir: tmp/
+    # auto 会把中文短句误判成韩文；固定 zh
+    language: zh
+
+LLM:
+  DeepSeekLLM:
+    type: openai
+    model_name: ${LLM_MODEL}
+    base_url: ${LLM_BASE_URL}
+    api_key: ${LLM_API_KEY}
+    temperature: ${LLM_TEMPERATURE}
+    max_tokens: ${LLM_MAX_TOKENS}
+    # LLM 卡住时不要干等；read=15s 是 chunk 之间的上限
+    timeout:
+      pool: 2
+      connect: 5
+      write: 10
+      read: 15
+    max_retries: 1
+
+TTS:
+  EdgeTTS:
+    type: edge
+    voice: ${TTS_VOICE}
+    # 整段合成：LLM 全文到齐后只调一次 TTS
+    batch_mode: true
+    # 流式：边收边编码
+    stream_mode: true
+    output_dir: tmp/
+
+plugins:
+  get_weather:
+    api_host: "${QWEATHER_API_HOST}"
+    api_key: "${QWEATHER_API_KEY}"
+    default_location: "${DEFAULT_CITY}"
+  deepsearch:
+    # 留空 = 复用 LLM.DeepSeekLLM.api_key
+    api_key: ""
+    count: 6

@@ -36,6 +36,9 @@
 
 # Build files
 build/
+build6*/
+build-verify/
+build-host-tests/
 cmake-build-*/
 /components/
 managed_components/
@@ -64,5 +67,10 @@ obj/
 sdkconfig
 sdkconfig.old
 sdkconfig.defaults.local
+sdkconfig.defaults.local.bak-*
+sdkconfig.bak-*
+sdkconfig.old.bak-*
+sdkconfig.*.bak
+local.conf
 
 xiaozhi-esp32/

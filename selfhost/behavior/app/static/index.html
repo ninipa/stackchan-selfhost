@@ -1,0 +1,2882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F0E7">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23191712'/%3E%3Crect x='19' y='20' width='8' height='16' rx='4' fill='%239CEFD9'/%3E%3Crect x='37' y='20' width='8' height='16' rx='4' fill='%239CEFD9'/%3E%3Cpath d='M26 43c3 4 9 4 12 0' stroke='%239CEFD9' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>包子 · Chan</title>
+<style>
+  /* ========== 基础 ========== */
+  :root{
+    --bg:#F5F0E7;
+    --surface:#FFFCF6;
+    --surface-2:#F7F1E6;
+    --ink:#211D17;
+    --ink-2:#4E4739;
+    --muted:#7C7261;
+    --dim:#A29885;
+    --line:rgba(33,29,23,.08);
+    --line-2:rgba(33,29,23,.14);
+    --accent:#C4552F;
+    --accent-2:#D96B44;
+    --accent-soft:#F6E2D6;
+    --mint:#2F8C72;
+    --mint-soft:#DFEFE7;
+    --amber:#B97C25;
+    --amber-soft:#F6E8CD;
+    --red:#B8423A;
+    --red-soft:#F5DCD8;
+    --dark:#191712;
+    --eye:#9CEFD9;
+    --shadow-card:0 18px 44px -34px rgba(54,40,22,.5);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
+  html{background:var(--bg)}
+  body{
+    margin:0;color:var(--ink);background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+    background:
+      radial-gradient(90% 45% at 50% -12%, rgba(255,246,228,.95), transparent 70%),
+      radial-gradient(60% 32% at 100% 100%, rgba(217,107,68,.055), transparent 70%);
+  }
+  body.no-scroll{overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer}
+  input,textarea{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  ::selection{background:var(--accent-soft)}
+
+  .app{max-width:560px;margin:0 auto;min-height:100dvh;position:relative}
+  .icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+  .icon.sm{width:16px;height:16px}
+  .icon.lg{width:24px;height:24px}
+
+  /* ========== 页面切换 ========== */
+  .page{display:none;min-height:100dvh}
+  .page.on{display:block;animation:pageIn .3s var(--ease)}
+  @keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* ========== 首页头部 ========== */
+  .home-head{padding:calc(22px + env(safe-area-inset-top)) 22px 8px}
+  .head-row{display:flex;align-items:center;gap:12px}
+  .head-title{flex:1;min-width:0}
+  .overline{font-size:10.5px;font-weight:600;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+  .home-name{
+    margin:4px 0 0;font-size:30px;line-height:1.12;font-weight:700;letter-spacing:-.03em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .icon-btn{
+    width:40px;height:40px;border-radius:50%;border:0;background:transparent;
+    display:grid;place-items:center;color:var(--ink-2);flex:0 0 auto;
+    transition:background .15s,transform .12s;
+  }
+  .icon-btn:active{background:rgba(33,29,23,.06);transform:scale(.95)}
+
+  /* ========== 机器人卡片 ========== */
+  .hero{
+    position:relative;overflow:hidden;margin:6px 18px 16px;padding:17px 18px 19px;
+    border-radius:32px;color:#F8F3E9;
+    background:radial-gradient(120% 95% at 50% -5%, #312B20 0%, #1C1913 58%, #15130F 100%);
+    box-shadow:0 30px 70px -42px rgba(26,20,10,.85);
+  }
+  .hero::before{
+    content:"";position:absolute;left:50%;top:-55%;width:90%;aspect-ratio:1;
+    transform:translateX(-50%);
+    background:radial-gradient(closest-side, rgba(156,239,217,.17), transparent);
+    pointer-events:none;
+  }
+  .hero-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .hero-pill{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:11.5px;font-weight:500;color:var(--eye);
+    background:rgba(156,239,217,.08);border:1px solid rgba(156,239,217,.16);
+    padding:6px 11px;border-radius:999px;
+  }
+  .hero-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--eye);box-shadow:0 0 9px rgba(156,239,217,.9)}
+  .hero-fw{font-size:11px;letter-spacing:.03em;color:rgba(248,243,233,.42)}
+  .hero-body{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
+  .face{display:flex;flex-direction:column;align-items:center;justify-content:center;width:140px;height:104px;margin:10px auto 6px}
+  .eyes{display:flex;gap:27px}
+  .eye{
+    width:25px;height:38px;border-radius:13px;background:var(--eye);
+    box-shadow:0 0 28px rgba(156,239,217,.5);
+    animation:blink 7s infinite;transform-origin:center;
+  }
+  .eye:nth-child(2){animation-delay:.09s}
+  .mouth{width:24px;height:11px;border-bottom:3px solid rgba(156,239,217,.85);border-radius:0 0 14px 14px;margin-top:10px}
+  @keyframes blink{0%,93%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}97%{transform:scaleY(1)}}
+  .hero-sub{text-align:center;font-size:12px;color:rgba(248,243,233,.5);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hero.offline .eye{background:#5D594E;box-shadow:none;animation:none}
+  .hero.offline .mouth{border-color:#5D594E}
+  .hero.offline .hero-pill{color:#E7C6C1;background:rgba(184,66,58,.14);border-color:rgba(184,66,58,.3)}
+  .hero.offline .hero-pill .dot{background:#C2564D;box-shadow:none}
+  .hero.offline::before{background:radial-gradient(closest-side, rgba(184,66,58,.12), transparent)}
+
+  /* ========== 卡片 / 发消息 ========== */
+  .card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:24px;box-shadow:var(--shadow-card);
+  }
+  .composer{margin:0 18px 22px;padding:17px}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .card-head h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .card-hint{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .composer.offline .card-hint{color:var(--red)}
+  #sayText{
+    display:block;width:100%;min-height:62px;max-height:168px;resize:none;
+    border:0;border-radius:16px;background:var(--surface-2);
+    padding:13px 14px;font-size:16px;line-height:1.5;color:var(--ink);
+    outline:none;transition:box-shadow .15s;
+  }
+  #sayText::placeholder{color:#AA9F8D}
+  #sayText:focus{box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .composer-foot{display:flex;align-items:center;gap:12px;margin-top:14px}
+  .stepper{display:inline-flex;align-items:center;gap:1px;background:var(--surface-2);border-radius:999px;padding:4px}
+  .stepper-label{font-size:11px;color:var(--muted);padding:0 6px 0 9px;white-space:nowrap}
+  .stepper button{
+    width:32px;height:32px;border:0;border-radius:50%;background:transparent;
+    display:grid;place-items:center;color:var(--ink-2);
+  }
+  .stepper button:active{background:rgba(33,29,23,.07)}
+  .stepper-val{min-width:22px;text-align:center;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stepper-val b{font-size:14px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .send-btn{
+    margin-left:auto;display:inline-flex;align-items:center;gap:7px;
+    border:0;border-radius:999px;padding:12px 19px;
+    background:var(--accent);color:#FFF8F1;font-size:14px;font-weight:600;
+    box-shadow:0 12px 24px -14px rgba(196,85,47,.9);
+    transition:transform .12s,opacity .15s;
+  }
+  .send-btn:active{transform:scale(.97)}
+  .send-btn:disabled{opacity:.42;box-shadow:none}
+  .status-line{font-size:12px;line-height:1.5;margin:9px 2px 0;min-height:18px;color:var(--muted);word-break:break-word}
+  .status-line.ok{color:var(--mint)}
+  .status-line.bad{color:var(--red)}
+  .status-line.warn{color:var(--amber)}
+  .status-line.center{text-align:center}
+
+  /* ========== 工具区 ========== */
+  .section{padding:0 18px;margin-bottom:24px}
+  .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 4px 10px}
+  .section-head h2{margin:0;font-size:12.5px;font-weight:600;letter-spacing:.03em;color:var(--ink-2)}
+  .head-actions{display:flex;align-items:center;gap:14px}
+  .link{border:0;background:none;color:var(--accent);font-size:12.5px;font-weight:600;padding:2px 0}
+  .link.danger-link{color:var(--red)}
+  .tiles{display:flex;flex-direction:column;gap:11px}
+  .tile{
+    display:flex;align-items:center;gap:12px;min-height:84px;
+    padding:15px;border-radius:22px;border:1px solid var(--line);
+    background:var(--surface);box-shadow:var(--shadow-card);
+    text-align:left;transition:transform .13s,box-shadow .2s;
+  }
+  .tile:active{transform:scale(.98)}
+  .tile-icon{
+    width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:0 0 auto;
+    background:var(--surface-2);color:var(--ink-2);
+  }
+  .tile-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .tile-body b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+  .tile-body small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .chev{color:#B6AB99;display:grid;place-items:center}
+  .tile-timer{background:linear-gradient(135deg,#FDF0E8 0%,#F8E3D6 100%);border-color:#EFD7C8}
+  .tile-timer .tile-icon{background:rgba(196,85,47,.1);color:var(--accent)}
+  .tile-history{background:linear-gradient(135deg,#EAF4EE 0%,#DDEDE3 100%);border-color:#D4E7DB}
+  .tile-history .tile-icon{background:rgba(47,140,114,.1);color:var(--mint)}
+  .tile-settings{background:linear-gradient(135deg,#FBF1DF 0%,#F4E6CB 100%);border-color:#EEDFC2}
+  .tile-settings .tile-icon{background:rgba(185,124,37,.11);color:var(--amber)}
+  .tile-timer.running{background:linear-gradient(135deg,#211E17 0%,#312A20 100%);border-color:#312A20;color:#F8F3E9}
+  .tile-timer.running .tile-body small{color:rgba(248,243,233,.58)}
+  .tile-timer.running .tile-icon{background:rgba(156,239,217,.1);color:var(--eye)}
+  .tile-timer.running .chev{color:rgba(248,243,233,.38)}
+  .mini-ring{
+    width:42px;height:42px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+    background:conic-gradient(var(--eye) calc(var(--p,0) * 1%), rgba(156,239,217,.16) 0);
+  }
+  .mini-ring::after{content:"";width:32px;height:32px;border-radius:50%;background:#241F17}
+  .tile-timer.running .tile-idle-icon{display:none}
+  .tile-timer:not(.running) .mini-ring{display:none}
+
+  /* ========== 最近 ========== */
+  .list-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow-card)}
+  .row{
+    display:flex;align-items:center;gap:12px;width:100%;padding:13px 15px;
+    border:0;border-bottom:1px solid var(--line);background:none;text-align:left;
+  }
+  .row:last-child{border-bottom:0}
+  .row:active{background:var(--surface-2)}
+  .row-icon{
+    width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto;
+  }
+  .row-icon.msg{background:var(--accent-soft);color:var(--accent)}
+  .row-icon.timer{background:var(--mint-soft);color:var(--mint)}
+  .row-main{flex:1;min-width:0}
+  .row-title{display:block;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pill{font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:999px;white-space:nowrap;flex:0 0 auto}
+  .pill.ok{background:var(--mint-soft);color:var(--mint)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.bad{background:var(--red-soft);color:var(--red)}
+  .pill.live{background:var(--accent-soft);color:var(--accent)}
+  .pill.mute{background:rgba(33,29,23,.055);color:var(--muted)}
+  .home-foot{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--dim);padding:2px 0 calc(26px + env(safe-area-inset-bottom))}
+
+  /* ========== 子页头 ========== */
+  .page-head{
+    position:sticky;top:0;z-index:30;
+    display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:4px;
+    padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+    background:rgba(245,240,231,.9);
+    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  }
+  .page-head h1{margin:0;text-align:center;font-size:16.5px;font-weight:600;letter-spacing:-.01em}
+  .page-main{padding:6px 18px calc(30px + env(safe-area-inset-bottom))}
+
+  /* ========== 番茄钟：设置态 ========== */
+  #timerIdle{display:flex;flex-direction:column;min-height:calc(100dvh - 150px)}
+  .duration-hero{text-align:center;padding:16px 0 4px}
+  .duration-value{
+    margin-top:6px;font-size:76px;line-height:1;font-weight:200;letter-spacing:-.04em;
+    font-variant-numeric:tabular-nums;
+  }
+  .duration-value .unit{font-size:19px;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:7px}
+  .preset-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 9px}
+  .preset{
+    border:1px solid var(--line);background:var(--surface);border-radius:16px;
+    padding:11px 2px 10px;text-align:center;transition:background .15s,color .15s,transform .12s;
+  }
+  .preset:active{transform:scale(.96)}
+  .preset b{display:block;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+  .preset small{display:block;margin-top:1px;font-size:10px;color:var(--muted)}
+  .preset.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+  .preset.on small{color:rgba(255,252,246,.55)}
+  .custom-row{
+    display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+    padding:11px;border:1px dashed var(--line-2);border-radius:14px;
+    background:transparent;color:var(--muted);font-size:12.5px;
+  }
+  .custom-row.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .demo-link{
+    display:block;margin:9px auto 0;border:0;background:none;padding:4px 10px;
+    color:var(--muted);font-size:11.5px;text-decoration:underline;
+    text-decoration-style:dotted;text-underline-offset:4px;text-decoration-color:var(--line-2);
+  }
+  .task-card{padding:15px 16px 10px;margin:15px 0 0}
+  .task-card label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:7px}
+  .task-card input{
+    display:block;width:100%;border:0;background:transparent;padding:1px 0;
+    font-size:17px;font-weight:500;outline:none;
+  }
+  .task-card input::placeholder{color:#B4A996;font-weight:400}
+  .char-count{text-align:right;font-size:10.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
+  .today-stats{display:flex;gap:10px;width:100%;max-width:420px;margin:16px auto 0}
+  .timer-bottom{margin-top:auto;display:flex;flex-direction:column}
+  .timer-tip{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:8px 10px 15px;font-size:11.5px;line-height:1.5;color:var(--dim);
+  }
+  .tip-icon{
+    width:26px;height:26px;border-radius:9px;background:var(--surface-2);
+    display:grid;place-items:center;color:var(--muted);flex:0 0 auto;
+  }
+  .stat-box{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:13px 15px;box-shadow:var(--shadow-card)}
+  .stat-box .num{font-size:25px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+  .stat-box .num small{font-size:11px;font-weight:500;color:var(--muted);margin-left:2px}
+  .stat-box .lab{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .timer-cta{width:100%;max-width:420px;margin:0 auto;padding:14px 0 0}
+  .primary{
+    display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    border:0;border-radius:18px;padding:16px;background:var(--accent);color:#FFF8F1;
+    font-size:16px;font-weight:600;letter-spacing:.01em;
+    box-shadow:0 18px 34px -18px rgba(196,85,47,.75);
+    transition:transform .12s,opacity .15s;
+  }
+  .primary:active{transform:scale(.985)}
+  .primary:disabled{opacity:.45;box-shadow:none}
+
+  /* ========== 番茄钟：运行态 ========== */
+  #timerRun{display:flex;flex-direction:column;min-height:calc(100dvh - 130px)}
+  .run-focus{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+  .run-top{text-align:center;padding:14px 0 2px}
+  .phase-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.1em;
+    background:var(--mint-soft);color:var(--mint);
+    transition:background .25s,color .25s;
+  }
+  .phase-pill.fuse{background:var(--amber-soft);color:var(--amber)}
+  .phase-pill.overtime{background:var(--red-soft);color:var(--red)}
+  .run-task{font-size:13.5px;color:var(--ink-2);margin:10px 0 0;min-height:20px;padding:0 20px}
+  .ring-wrap{position:relative;width:min(80vw,320px);aspect-ratio:1;margin:16px auto 8px;transition:filter .3s}
+  .ring-wrap.over{filter:drop-shadow(0 0 14px rgba(184,66,58,.22))}
+  .ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring-track{fill:none;stroke:rgba(33,29,23,.065);stroke-width:11}
+  .ring-progress{
+    fill:none;stroke:url(#ringGrad);stroke-width:11;stroke-linecap:round;
+    transition:stroke-dashoffset .25s linear, stroke .3s;
+  }
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .big-time{
+    font-size:62px;line-height:1;font-weight:200;letter-spacing:-.035em;
+    font-variant-numeric:tabular-nums;transition:color .3s;
+  }
+  .big-time.over{color:var(--red)}
+  .ring-sub{font-size:11.5px;color:var(--muted);margin-top:9px;transition:color .3s}
+  .ring-sub.over{color:var(--red)}
+  .run-actions{width:100%;max-width:420px;margin:0 auto;padding-top:20px}
+  .text-btn{width:100%;border:0;background:none;padding:15px;font-size:13px;color:var(--muted)}
+  .text-btn.danger{color:var(--red)}
+  .run-stats{text-align:center;font-size:11px;color:var(--dim);margin:16px 0 0}
+
+  /* ========== 历史 ========== */
+  .segmented{display:flex;gap:2px;background:rgba(33,29,23,.055);border-radius:999px;padding:4px;margin:8px 0 18px}
+  .segmented button{
+    flex:1;border:0;border-radius:999px;background:transparent;padding:9px 0;
+    font-size:12.5px;font-weight:500;color:var(--muted);transition:background .18s,color .18s;
+  }
+  .segmented button.on{background:var(--surface);color:var(--ink);box-shadow:0 3px 10px rgba(54,40,22,.08)}
+  .day-group{margin-bottom:20px}
+  .day-label{margin:0 5px 8px;font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--dim)}
+
+  /* ========== 设置 ========== */
+  .group{margin-bottom:24px}
+  .group-title{margin:0 4px 9px;font-size:10.5px;font-weight:600;letter-spacing:.14em;color:var(--muted)}
+  .form-card{padding:16px}
+  .form-card label{display:block;font-size:11.5px;color:var(--muted);margin:15px 0 7px}
+  .form-card label:first-child{margin-top:0}
+  .form-card input[type=text],.form-card input[type=password],.form-card input[type=number]{
+    width:100%;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);
+    padding:12px 14px;font-size:16px;outline:none;transition:border-color .15s,box-shadow .15s;
+  }
+  .form-card input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .input-row{position:relative}
+  .input-row input{padding-right:46px}
+  .input-row .icon-btn{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:38px;height:38px;color:var(--muted)}
+  .hint{font-size:11.5px;line-height:1.6;color:var(--muted);margin:8px 2px 0}
+  .hint code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--ink-2)}
+  .form-card input::placeholder{color:#B4A996}
+  .btn-row{display:flex;gap:9px;margin-top:14px}
+  .ghost{
+    border:1px solid var(--line);border-radius:14px;background:var(--surface-2);color:var(--ink-2);
+    padding:13px 16px;font-size:14px;font-weight:500;transition:transform .12s,background .15s;
+  }
+  .ghost:active{transform:scale(.98);background:var(--line)}
+  .ghost:disabled{opacity:.5}
+  .btn-row .primary{flex:1;padding:13px;font-size:14.5px;border-radius:14px;box-shadow:none}
+  .inline-form{display:flex;gap:9px}
+  .inline-form input{flex:1;min-width:0}
+  .inline-form .ghost{flex:0 0 auto;min-width:84px}
+  .device-card{padding:16px}
+  .device-top{display:flex;align-items:center;gap:12px}
+  .mini-face{
+    width:44px;height:44px;border-radius:15px;background:var(--dark);
+    display:flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;
+  }
+  .mini-face i{display:block;width:5px;height:11px;border-radius:3px;background:var(--eye)}
+  .mini-face.off i{background:#5D594E}
+  .device-id{flex:1;min-width:0}
+  .device-id b{display:block;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .device-id small{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+  .kv{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:9px}
+  .kv-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;font-size:12.5px}
+  .kv-row .k{color:var(--muted);flex:0 0 auto}
+  .kv-row .v{color:var(--ink-2);text-align:right;word-break:break-all;min-width:0}
+  .kv-row .v.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+  .kv-card{padding:16px;display:grid;gap:11px}
+  .kv-card .kv-row + .kv-row{border-top:1px solid var(--line);padding-top:11px}
+  .stats-line{font-size:11px;line-height:1.6;color:var(--dim);margin:10px 2px 0;word-break:break-word}
+  .action-list{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow-card);margin-top:12px}
+  .action-row{
+    display:flex;align-items:center;gap:12px;width:100%;padding:14px 15px;
+    border:0;border-bottom:1px solid var(--line);background:none;text-align:left;
+  }
+  .action-row:last-child{border-bottom:0}
+  .action-row:active{background:var(--surface-2)}
+  .action-icon{width:34px;height:34px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;color:var(--muted);flex:0 0 auto}
+  .action-text{flex:1;min-width:0}
+  .action-text b{display:block;font-size:13.5px;font-weight:500}
+  .action-text small{display:block;font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .action-row .chev{color:#B6AB99;display:grid;place-items:center}
+  .app-foot{text-align:center;font-size:10.5px;line-height:1.7;color:var(--dim);padding:2px 0 12px}
+
+  /* ========== 空状态 ========== */
+  .empty{padding:27px 16px;text-align:center;color:var(--muted)}
+  .empty.small{padding:18px 12px}
+  .empty-face{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    width:58px;height:46px;border-radius:17px;background:var(--dark);
+  }
+  .empty-face i{width:6px;height:12px;border-radius:3px;background:var(--eye);opacity:.65}
+  .empty b{display:block;margin-top:11px;font-size:13.5px;font-weight:600;color:var(--ink-2)}
+  .empty p{margin:5px 0 0;font-size:11.5px;line-height:1.55;color:var(--muted)}
+  .empty.small .empty-face{width:44px;height:36px;border-radius:13px;gap:7px}
+  .empty.small .empty-face i{width:5px;height:10px}
+
+  /* ========== 横幅 / Toast / 抽屉 ========== */
+  .banner{
+    display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:16px;
+    margin:8px 18px 4px;
+    background:#3A211D;color:#F6DDD8;border:1px solid rgba(246,221,216,.16);
+    box-shadow:0 12px 30px -22px rgba(58,33,29,.85);font-size:12.5px;
+  }
+  .banner-text{flex:1;min-width:0;line-height:1.45}
+  .banner-action{
+    border:0;border-radius:9px;background:rgba(255,255,255,.1);color:inherit;
+    padding:6px 10px;font-size:11.5px;font-weight:600;flex:0 0 auto;
+  }
+  .banner-close{border:0;background:none;color:inherit;padding:3px;opacity:.7;display:grid;place-items:center;flex:0 0 auto}
+
+  .toast{
+    position:fixed;z-index:100;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translate(-50%,14px);max-width:calc(100vw - 40px);
+    padding:12px 18px;border-radius:999px;background:var(--ink);color:var(--surface);
+    font-size:12.5px;line-height:1.4;text-align:center;
+    box-shadow:0 20px 44px -20px rgba(33,29,23,.7);
+    opacity:0;pointer-events:none;transition:opacity .22s,transform .22s var(--ease);
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .toast.err{background:var(--red);color:#fff}
+
+  .sheet-backdrop{
+    position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center;
+    background:rgba(24,20,14,.38);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+    opacity:0;transition:opacity .2s;
+  }
+  .sheet-backdrop.on{opacity:1}
+  .sheet{
+    width:100%;max-width:560px;background:var(--surface);
+    border-radius:28px 28px 0 0;padding:8px 20px calc(18px + env(safe-area-inset-bottom));
+    transform:translateY(22px);transition:transform .28s var(--ease);
+    box-shadow:0 -24px 70px -24px rgba(30,24,14,.4);
+  }
+  .sheet-backdrop.on .sheet{transform:none}
+  .sheet-handle{width:38px;height:4px;border-radius:99px;background:var(--line-2);margin:4px auto 16px}
+  .sheet h2{margin:0 0 7px;font-size:18px;font-weight:600;letter-spacing:-.01em}
+  .sheet p{margin:0 0 18px;font-size:12.5px;line-height:1.65;color:var(--muted)}
+  .sheet p:empty{display:none}
+  #sheetActions{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  #sheetActions button{border:0;border-radius:16px;padding:15px;font-size:15px;font-weight:600}
+  #sheetActions .primary{background:var(--accent);color:#FFF8F1;box-shadow:none}
+  #sheetActions .ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+  #sheetActions .danger-solid{background:var(--red);color:#FFF8F1;box-shadow:none}
+  .custom-picker{display:flex;align-items:center;justify-content:center;gap:20px;margin:4px 0 14px}
+  .custom-picker input{
+    width:130px;border:0;background:transparent;text-align:center;
+    font-size:46px;line-height:1;font-weight:250;letter-spacing:-.03em;
+    color:var(--ink);font-variant-numeric:tabular-nums;outline:none;padding:0;
+    -moz-appearance:textfield;
+  }
+  .custom-picker input::-webkit-inner-spin-button,.custom-picker input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .custom-picker input::selection{background:transparent;color:var(--ink)}
+  .round-btn{
+    width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+    background:var(--surface-2);display:grid;place-items:center;color:var(--ink-2);
+  }
+  .round-btn:active{background:var(--line)}
+
+  /* ========== 遥控台 ========== */
+  .tile-teleop{background:linear-gradient(135deg,#E8F2FC 0%,#D9E8F8 100%);border-color:#CFE1F3}
+  .tile-teleop .tile-icon{background:rgba(43,108,176,.1);color:#2B6CB0}
+
+  .teleop-stage{
+    position:relative;border-radius:26px;overflow:hidden;background:#0E0D0B;
+    aspect-ratio:4/3;box-shadow:0 24px 60px -40px rgba(20,15,8,.8);
+  }
+  .teleop-stage img{width:100%;height:100%;object-fit:contain;display:block;background:#0E0D0B}
+  .stage-hint{
+    position:absolute;inset:0;display:grid;place-items:center;color:rgba(248,243,233,.6);
+    font-size:12.5px;text-align:center;line-height:1.6;padding:22px;
+  }
+  .teleop-hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+  .teleop-pill{
+    font-size:10.5px;color:#CFE3FF;background:rgba(10,14,20,.55);border:1px solid rgba(207,227,255,.18);
+    padding:4px 9px;border-radius:999px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  }
+
+  .teleop-pad{display:grid;gap:12px;margin-top:14px}
+
+  /* 绝对位置摇杆：knob 位置 = 目标角度，App 侧限速后追过去 */
+  .joystick-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:13px 15px 11px;box-shadow:var(--shadow-card)}
+  .joy-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .joy-title{font-size:12px;font-weight:600;color:var(--ink-2)}
+  .joy-note{font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .joy-wrap{position:relative;width:fit-content;margin:0 auto;padding:15px 28px}
+  .joystick{
+    /* 横轴 180° / 纵轴 80°：用 2:1 宽盘，纵向不会比横向“窜”太多；
+       同时比正方形矮一半，给下面的相册留出空间。 */
+    position:relative;width:min(58vw,220px);aspect-ratio:2/1;border-radius:16px;
+    background:radial-gradient(140% 160% at 50% 38%, #FFFDF8 0%, var(--surface-2) 78%);
+    border:1px solid var(--line-2);box-shadow:inset 0 2px 10px rgba(33,29,23,.055);
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  .joystick:focus{outline:2px solid rgba(43,108,176,.28);outline-offset:3px}
+  .joystick::before,.joystick::after{content:'';position:absolute;background:var(--line);opacity:.75;pointer-events:none}
+  .joystick::before{left:50%;top:13%;bottom:13%;width:1px;transform:translateX(-.5px)}
+  .joystick::after{top:50%;left:13%;right:13%;height:1px;transform:translateY(-.5px)}
+  .joy-knob{
+    position:absolute;left:50%;top:50%;width:36px;height:36px;border-radius:50%;
+    transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line-2);
+    box-shadow:0 9px 20px -11px rgba(33,29,23,.65);pointer-events:none;
+    display:grid;place-items:center;transition:background .15s,border-color .15s;
+  }
+  .joy-knob::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.78}
+  .joystick.dragging .joy-knob{transition:none;box-shadow:0 12px 24px -12px rgba(33,29,23,.75)}
+  .joystick.at-limit .joy-knob{border-color:#C98A2E;background:#FFF6E4}
+  .joystick.at-limit .joy-knob::after{background:#C98A2E}
+  .joy-tick{position:absolute;font-size:9px;color:var(--dim);pointer-events:none;font-variant-numeric:tabular-nums}
+  .joy-tick.top{top:0;left:50%;transform:translateX(-50%)}
+  .joy-tick.bottom{bottom:0;left:50%;transform:translateX(-50%)}
+  .joy-tick.left{left:0;top:50%;transform:translateY(-50%)}
+  .joy-tick.right{right:0;top:50%;transform:translateY(-50%)}
+  .joy-readout{display:flex;align-items:baseline;gap:16px;margin-top:9px;padding:0 2px}
+  .joy-val{display:flex;align-items:baseline;gap:5px}
+  .joy-val small{font-size:10px;color:var(--muted)}
+  .joy-val b{font-size:15px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .joy-state{margin-left:auto;font-size:10px;color:var(--dim);padding:3px 8px;border-radius:999px;background:var(--surface-2)}
+
+  .teleop-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .teleop-actions button{
+    border-radius:18px;padding:13px 8px;font-size:12.5px;font-weight:600;
+    background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-card);
+    display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink-2);
+  }
+  .teleop-actions button:active{transform:scale(.97)}
+  .teleop-actions .icon{color:var(--muted)}
+  .teleop-actions .snap{background:var(--dark);color:#F8F3E9;border-color:var(--dark)}
+  .teleop-actions .snap .icon{color:var(--eye)}
+  .teleop-hint{font-size:11px;color:var(--dim);line-height:1.6;margin:2px 2px 0}
+  .photo-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .photo-strip .shot{padding:0;border:0;border-radius:12px;overflow:hidden;aspect-ratio:4/3;background:#0E0D0B}
+  .photo-strip .shot img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo-strip .empty{grid-column:1/-1}
+  .photo-big{width:100%;border-radius:18px;display:block}
+
+  /* ========== 平板 ========== */
+  @media (min-width:760px){
+    .app{max-width:680px}
+    .home-head{padding-left:30px;padding-right:30px}
+    .home-name{font-size:34px}
+    .hero,.composer{margin-left:24px;margin-right:24px}
+    .banner{margin-left:24px;margin-right:24px}
+    .section{padding-left:24px;padding-right:24px}
+    .page-main{padding-left:26px;padding-right:26px}
+    .face{height:128px}
+    .eye{width:30px;height:44px;border-radius:15px}
+    .eyes{gap:32px}
+    .mouth{width:28px;height:12px}
+    .duration-value{font-size:88px}
+    .ring-wrap{width:340px}
+  }
+  @media (max-width:360px){
+    .home-name{font-size:26px}
+    .hero{margin-left:14px;margin-right:14px}
+    .composer{margin-left:14px;margin-right:14px}
+    .section{padding-left:14px;padding-right:14px}
+    .page-main{padding-left:14px;padding-right:14px}
+    .composer-foot{gap:8px}
+    .stepper-label{font-size:10px;padding:0 4px 0 7px}
+    .duration-value{font-size:64px}
+    .big-time{font-size:54px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17.5 7H20M4 17h3M11.5 17H20"/><circle cx="15" cy="7" r="2.3"/><circle cx="9" cy="17" r="2.3"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M5.2 12.2 19 5.4l-4.1 13.2-3.6-4.6-6.1-1.8Z"/><path d="m11.2 14 3.3-3.3"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.2"/><path d="M12 9.8V13l2.2 1.4M9.5 3.5h5M12 3.5v2.3"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M4.7 9.5A7.8 7.8 0 1 1 4.5 14"/><path d="M4.4 4.8v4.8h4.8M12 8.6V12l2.6 1.6"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M20 11.5a7.2 7.2 0 0 1-7.2 7.2H8.4L4 21l.9-4A7.2 7.2 0 1 1 20 11.5Z"/><path d="M8.6 11.6h.01M12 11.6h.01M15.4 11.6h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4.5V10h-5.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12S6.2 6.5 12 6.5 21.2 12 21.2 12 17.8 17.5 12 17.5 2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m4 4 16 16M9.9 6.9A9.7 9.7 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a16 16 0 0 1-3.1 3.6M6.2 8.6A16 16 0 0 0 2.8 12S6.2 17.5 12 17.5a9.8 9.8 0 0 0 4-.8"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.8h5V7M7 7l.9 12.2h8.2L17 7M10 11v4.5M14 11v4.5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8.2 10.4 12 14.2l3.8-3.8M5 19h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V6M8.2 9.6 12 5.8l3.8 3.8M5 19h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="9.5" rx="2.5"/><path d="M8.2 10V7.8a3.8 3.8 0 0 1 7.6 0V10"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5h3l1.6-2.2h6.8L17 8.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.2" r="3.4"/></symbol>
+  <symbol id="i-center" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4.5 8.5a8 8 0 0 1 15 0"/><path d="M19.5 15.5a8 8 0 0 1-15 0"/><path d="M12 3v3"/></symbol>
+</svg>
+
+<div class="app" id="app">
+
+  <!-- 全局错误横幅：连不上 / token 不对时出现，不让页面静默失败 -->
+  <div class="banner" id="banner" hidden>
+    <span class="banner-text" id="bannerText"></span>
+    <button class="banner-action" id="bannerFix">去设置</button>
+    <button class="banner-close" id="bannerClose" aria-label="关闭">
+      <svg class="icon sm"><use href="#i-close"></use></svg>
+    </button>
+  </div>
+
+  <!-- ==================== 首页 ==================== -->
+  <section class="page on" id="page-home">
+    <header class="home-head">
+      <div class="head-row">
+        <div class="head-title">
+          <div class="overline">你的桌面伙伴</div>
+          <h1 class="home-name" id="homeName">包子</h1>
+        </div>
+        <button class="icon-btn" id="homeSettings" aria-label="设置">
+          <svg class="icon"><use href="#i-settings"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero" id="hero">
+      <div class="hero-top">
+        <span class="hero-pill"><span class="dot"></span><span id="heroStatusText">连接中</span></span>
+        <span class="hero-fw" id="heroFw"></span>
+      </div>
+      <div class="hero-body">
+        <div class="face" aria-hidden="true">
+          <div class="eyes"><i class="eye"></i><i class="eye"></i></div>
+          <div class="mouth"></div>
+        </div>
+        <div class="hero-sub" id="heroSub">正在读取设备状态…</div>
+      </div>
+    </section>
+
+    <section class="card composer" id="composer">
+      <div class="card-head">
+        <h2>让它说点什么</h2>
+        <span class="card-hint" id="composerHint">会念出来</span>
+      </div>
+      <textarea id="sayText" rows="2" maxlength="2000" placeholder="比如：该喝水啦"></textarea>
+      <div class="composer-foot">
+        <div class="stepper" aria-label="重复次数">
+          <span class="stepper-label">重复次数</span>
+          <button type="button" id="repeatMinus" aria-label="减少重复次数">
+            <svg class="icon sm"><use href="#i-minus"></use></svg>
+          </button>
+          <span class="stepper-val"><b id="repeatVal">1</b></span>
+          <button type="button" id="repeatPlus" aria-label="增加重复次数">
+            <svg class="icon sm"><use href="#i-plus"></use></svg>
+          </button>
+        </div>
+        <button type="button" class="send-btn" id="sendBtn" disabled>
+          <span>发送</span>
+          <svg class="icon sm"><use href="#i-send"></use></svg>
+        </button>
+      </div>
+      <p class="status-line" id="sendStatus"></p>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>工具</h2></div>
+      <div class="tiles">
+        <button type="button" class="tile tile-teleop" id="tileTeleop">
+          <span class="tile-icon"><svg class="icon"><use href="#i-camera"></use></svg></span>
+          <span class="tile-body">
+            <b>遥控</b>
+            <small id="tileTeleopSub">看画面 · 转头 · 拍照</small>
+          </span>
+          <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+        </button>
+        <button type="button" class="tile tile-timer" id="tileTimer">
+          <span class="tile-icon tile-idle-icon"><svg class="icon"><use href="#i-timer"></use></svg></span>
+          <span class="mini-ring" id="miniRing"></span>
+          <span class="tile-body">
+            <b id="tileTimerTitle">番茄钟</b>
+            <small id="tileTimerSub">开始一次 25 分钟的专注</small>
+          </span>
+          <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+        </button>
+        <button type="button" class="tile tile-history" id="tileHistory">
+          <span class="tile-icon"><svg class="icon"><use href="#i-history"></use></svg></span>
+          <span class="tile-body"><b>历史</b><small id="tileHistorySub">查看全部</small></span>
+          <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+        </button>
+        <button type="button" class="tile tile-settings" id="tileSettings">
+          <span class="tile-icon"><svg class="icon"><use href="#i-settings"></use></svg></span>
+          <span class="tile-body"><b>设置</b><small>连接与设备</small></span>
+          <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>最近</h2>
+        <button type="button" class="link" id="recentAll">全部</button>
+      </div>
+      <div class="list-card" id="recentList">
+        <div class="empty small"><div class="empty-face"><i></i><i></i></div><b>读取中</b></div>
+      </div>
+    </section>
+
+    <div class="home-foot">CHAN · 数据只留在家里</div>
+  </section>
+
+  <!-- ==================== 番茄钟 ==================== -->
+  <section class="page" id="page-timer">
+    <header class="page-head">
+      <button class="icon-btn" data-go="home" aria-label="返回">
+        <svg class="icon"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h1>番茄钟</h1>
+      <span></span>
+    </header>
+
+    <main class="page-main">
+      <!-- 设置态 -->
+      <div id="timerIdle">
+        <div class="duration-hero">
+          <div class="overline">专注时长</div>
+          <div class="duration-value"><span id="durValue">25</span><span class="unit">分钟</span></div>
+        </div>
+
+        <div class="preset-row" id="presetRow">
+          <button type="button" class="preset" data-min="15"><b>15</b><small>分钟</small></button>
+          <button type="button" class="preset on" data-min="25"><b>25</b><small>分钟</small></button>
+          <button type="button" class="preset" data-min="45"><b>45</b><small>分钟</small></button>
+          <button type="button" class="preset" data-min="60"><b>60</b><small>分钟</small></button>
+        </div>
+        <button type="button" class="custom-row" id="customPreset">
+          <svg class="icon sm"><use href="#i-plus"></use></svg>
+          <span id="customPresetLabel">自定义时长</span>
+        </button>
+        <button type="button" class="demo-link" id="demoMinute">1 分钟演示</button>
+
+        <section class="card task-card">
+          <label for="taskInput">这次要做什么</label>
+          <input id="taskInput" type="text" maxlength="20" placeholder="例如：写周报">
+          <div class="char-count"><span id="taskCount">0</span>/20</div>
+        </section>
+
+        <div class="timer-bottom">
+          <div class="timer-tip">
+            <span class="tip-icon"><svg class="icon sm"><use href="#i-timer"></use></svg></span>
+            <span>开始后，倒计时会同步到<span id="timerTipText">包子</span>的屏幕上</span>
+          </div>
+
+          <div class="timer-cta">
+            <p class="status-line center" id="timerMsg"></p>
+            <button type="button" class="primary" id="startTimer" disabled>开始专注</button>
+          </div>
+          <div class="today-stats" id="todayStats"></div>
+        </div>
+      </div>
+
+      <!-- 运行态 -->
+      <div id="timerRun" hidden>
+        <div class="run-focus">
+          <div class="run-top">
+            <span class="phase-pill" id="phasePill">专注</span>
+            <p class="run-task" id="runTask"></p>
+          </div>
+
+          <div class="ring-wrap" id="ringWrap">
+            <svg viewBox="0 0 300 300" aria-hidden="true">
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#E08A5B"></stop>
+                  <stop offset="1" stop-color="#C4552F"></stop>
+                </linearGradient>
+              </defs>
+              <circle class="ring-track" cx="150" cy="150" r="132"></circle>
+              <circle class="ring-progress" id="ringProgress" cx="150" cy="150" r="132"></circle>
+            </svg>
+            <div class="ring-center">
+              <div class="big-time" id="bigTime">25:00</div>
+              <div class="ring-sub" id="ringSub"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="run-actions">
+          <button type="button" class="primary" id="finishTimer">完成</button>
+          <button type="button" class="text-btn danger" id="abandonTimer">放弃任务</button>
+        </div>
+        <p class="status-line center" id="runMsg"></p>
+        <div class="run-stats" id="runStats"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ==================== 历史 ==================== -->
+  <section class="page" id="page-history">
+    <header class="page-head">
+      <button class="icon-btn" data-go="home" aria-label="返回">
+        <svg class="icon"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h1>历史</h1>
+      <button class="icon-btn" id="historyRefresh" aria-label="刷新">
+        <svg class="icon"><use href="#i-refresh"></use></svg>
+      </button>
+    </header>
+
+    <main class="page-main">
+      <div class="segmented" id="historyFilter">
+        <button type="button" data-filter="all" class="on">全部</button>
+        <button type="button" data-filter="message">消息</button>
+        <button type="button" data-filter="timer">番茄钟</button>
+      </div>
+      <div id="historyBody">
+        <div class="empty"><div class="empty-face"><i></i><i></i></div><b>读取中</b></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ==================== 遥控 ==================== -->
+  <section class="page" id="page-teleop">
+    <header class="page-head">
+      <button class="icon-btn" data-go="home" aria-label="返回">
+        <svg class="icon"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h1>遥控</h1>
+      <span></span>
+    </header>
+
+    <main class="page-main">
+      <div class="teleop-stage" id="teleopStage">
+        <img id="teleopFrame" alt="机器人看到的画面" hidden>
+        <div class="stage-hint" id="teleopStageHint">正在连接画面…</div>
+        <div class="teleop-hud">
+          <span class="teleop-pill" id="teleopFps">—</span>
+          <span class="teleop-pill" id="teleopAge">等待画面</span>
+        </div>
+      </div>
+
+      <div class="teleop-pad">
+        <div class="joystick-card">
+          <div class="joy-head">
+            <span class="joy-title">方向</span>
+            <span class="joy-note">Y 轴安全范围 5–85°</span>
+          </div>
+          <div class="joy-wrap">
+            <span class="joy-tick top">85°</span>
+            <span class="joy-tick bottom">5°</span>
+            <span class="joy-tick left">-90°</span>
+            <span class="joy-tick right">+90°</span>
+            <div class="joystick" id="teleopStick" tabindex="0" role="application"
+                 aria-label="方向摇杆：拖动圆点控制左右和俯仰">
+              <span class="joy-knob" id="teleopKnob"></span>
+            </div>
+          </div>
+          <div class="joy-readout">
+            <span class="joy-val"><small>左右</small><b id="teleopYawVal">0°</b></span>
+            <span class="joy-val"><small>俯仰</small><b id="teleopPitchVal">5°</b></span>
+            <span class="joy-state" id="teleopStickState">待命</span>
+          </div>
+          <p class="teleop-hint">拖动圆点 = 目标角度；底边可保持 5° 横扫，松手保持，到限位变琥珀色。</p>
+        </div>
+
+        <div class="teleop-actions">
+          <button type="button" id="teleopCenter">
+            <svg class="icon"><use href="#i-center"></use></svg>回正
+          </button>
+          <button type="button" class="snap" id="teleopSnap">
+            <svg class="icon"><use href="#i-camera"></use></svg>拍照
+          </button>
+          <button type="button" id="teleopScan">
+            <svg class="icon"><use href="#i-scan"></use></svg>环视
+          </button>
+        </div>
+
+        <p class="teleop-hint" id="teleopHint">进入页面即开流；离开页面或切后台会自动关闭摄像头并回正（断网 90 秒也会自动关闭）。</p>
+
+        <div class="section-head" style="margin-top:14px">
+          <h2>最近拍照</h2>
+          <div class="head-actions">
+            <button type="button" class="link danger-link" id="teleopGalleryClear">清空</button>
+            <button type="button" class="link" id="teleopGalleryAll">刷新</button>
+          </div>
+        </div>
+        <div class="photo-strip" id="teleopPhotos"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ==================== 设置 ==================== -->
+  <section class="page" id="page-settings">
+    <header class="page-head">
+      <button class="icon-btn" data-go="home" aria-label="返回">
+        <svg class="icon"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h1>设置</h1>
+      <span></span>
+    </header>
+
+    <main class="page-main">
+      <section class="group">
+        <h2 class="group-title">连接</h2>
+        <div class="card form-card">
+          <label for="server">服务器地址</label>
+          <input id="server" type="text" placeholder="留空 = 用当前页面的地址"
+                 inputmode="url" autocapitalize="off" spellcheck="false">
+          <p class="hint">留空就用地址栏里的地址。填了之后所有请求都发给它，比如
+            <code>http://192.168.1.20:8100</code> 或 <code>https://xxx.ts.net</code>。</p>
+
+          <label for="token">App Token</label>
+          <div class="input-row">
+            <input id="token" type="password" placeholder="粘贴 App Token"
+                   autocapitalize="off" spellcheck="false">
+            <button type="button" class="icon-btn" id="toggleToken" aria-label="显示 token">
+              <svg class="icon"><use href="#i-eye"></use></svg>
+            </button>
+          </div>
+          <p class="hint">对应服务端 <code>.env</code> 里的 <code>APP_TOKEN</code>，只存在本机浏览器。</p>
+
+          <div class="btn-row">
+            <button type="button" class="ghost" id="testConn">测试连接</button>
+            <button type="button" class="primary" id="saveConn">保存</button>
+          </div>
+          <p class="status-line" id="connResult"></p>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">设备</h2>
+        <div class="card device-card" id="devCard">
+          <div class="empty small"><b>读取中…</b></div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">服务器</h2>
+        <div class="card kv-card" id="roCard">
+          <div class="empty small"><b>读取中…</b></div>
+        </div>
+        <p class="hint">音色这些要改服务端文件并重启，不在这里提供开关。</p>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">存储</h2>
+        <div class="card form-card">
+          <label for="histKeep">历史保留条数</label>
+          <div class="inline-form">
+            <input id="histKeep" type="number" min="20" max="5000" step="10" inputmode="numeric">
+            <button type="button" class="ghost" id="saveHist">保存</button>
+          </div>
+          <p class="hint">只管上限，不会立刻删已有记录；新记录进来时才裁掉最旧的。
+            进行中的任务永远不会被删。</p>
+          <p class="stats-line" id="statsLine">统计读取中…</p>
+        </div>
+
+        <div class="action-list">
+          <button type="button" class="action-row" id="cleanupHist">
+            <span class="action-icon"><svg class="icon sm"><use href="#i-trash"></use></svg></span>
+            <span class="action-text"><b>清理历史</b><small>只删超出保留上限的已结束记录</small></span>
+            <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+          </button>
+          <button type="button" class="action-row" id="cleanupAudio">
+            <span class="action-icon"><svg class="icon sm"><use href="#i-trash"></use></svg></span>
+            <span class="action-text"><b>清理音频缓存</b><small>只清 24 小时前生成的音频</small></span>
+            <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+          </button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">备份</h2>
+        <div class="action-list">
+          <button type="button" class="action-row" id="exportBtn">
+            <span class="action-icon"><svg class="icon sm"><use href="#i-download"></use></svg></span>
+            <span class="action-text"><b>导出配置</b><small>服务器地址 + token，别随手发人</small></span>
+            <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+          </button>
+          <button type="button" class="action-row" id="importBtn">
+            <span class="action-icon"><svg class="icon sm"><use href="#i-upload"></use></svg></span>
+            <span class="action-text"><b>导入配置</b><small>换手机或重装后恢复连接参数</small></span>
+            <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+          </button>
+        </div>
+      </section>
+
+      <div class="app-foot">CHAN · 局域网直连<br>数据只留在家里的机器上</div>
+    </main>
+
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
+  </section>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="sheet-backdrop" id="sheetBackdrop" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-handle"></div>
+    <h2 id="sheetTitle"></h2>
+    <p id="sheetBody"></p>
+    <div id="sheetContent"></div>
+    <div id="sheetActions"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- 小工具 ---------- */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+  const pad = (n) => String(n).padStart(2, '0');
+  const mmss = (ms) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  };
+  const hhmm = (ts) => {
+    const d = new Date(ts * 1000);
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const relTime = (ts) => {
+    if (!ts) return '—';
+    const diff = (Date.now() - ts * 1000) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+    return `${new Date(ts * 1000).getMonth() + 1}/${new Date(ts * 1000).getDate()}`;
+  };
+  const fullTime = (ts) => {
+    const d = new Date(ts * 1000);
+    return `${d.getMonth() + 1} 月 ${d.getDate()} 日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const fmtBytes = (n) => {
+    if (!n) return '0 B';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  };
+  const icon = (name) => `<svg class="icon sm" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ---------- 路由 ---------- */
+  // 首页是唯一入口，其余页面从首页的卡片 / 按钮进入。
+  // 以后加新功能只需要加一块 tile 和一个 route，不会把底部导航挤爆。
+  const ROUTES = new Set(['home', 'teleop', 'timer', 'history', 'settings']);
+  const LEGACY_ROUTE = {
+    msg: 'home', home: 'home',
+    teleop: 'teleop', cam: 'teleop', camera: 'teleop',
+    timer: 'timer',
+    hist: 'history', history: 'history',
+    set: 'settings', settings: 'settings',
+  };
+  function routeFromHash() {
+    const raw = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+    return LEGACY_ROUTE[raw] || 'home';
+  }
+  function routeUrl(route) {
+    return location.pathname + location.search + (route === 'home' ? '' : '#' + route);
+  }
+  function go(route, { replace = false } = {}) {
+    if (!ROUTES.has(route)) route = 'home';
+    if (replace) history.replaceState({ route }, '', routeUrl(route));
+    else history.pushState({ route }, '', routeUrl(route));
+    renderRoute(route);
+  }
+  function renderRoute(route = routeFromHash()) {
+    if (!ROUTES.has(route)) route = 'home';
+    const prev = state.route;
+    // 离开遥控页 = 结束会话（关流 + 回正）；设备侧另有 30s 兜底超时
+    if (prev === 'teleop' && route !== 'teleop') teleopStop();
+    state.route = route;
+    $$('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + route));
+    if (!$('#banner').hidden) placeBanner();
+    window.scrollTo(0, 0);
+
+    if (route === 'home') {
+      renderDevice();
+      renderRecent();
+      renderTiles();
+      loadRecent();
+    } else if (route === 'teleop') {
+      renderDevice();
+      enterTeleopPage();
+    } else if (route === 'timer') {
+      renderDevice();
+      renderTimerPage();
+      syncActive();
+      loadHistory();
+    } else if (route === 'history') {
+      syncHistoryFilter();
+      renderHistory();
+      loadHistory();
+    } else if (route === 'settings') {
+      fillConnFields();
+      renderSettingsDevice();
+      loadSettings();
+    }
+  }
+  window.addEventListener('popstate', () => renderRoute(routeFromHash()));
+  window.addEventListener('hashchange', () => {
+    const r = routeFromHash();
+    if (r !== state.route) renderRoute(r);
+  });
+
+  /* ---------- 壳传入的配置（#cfg=base64url({base,token})） ---------- */
+  function decodeShellCfg() {
+    const m = (location.hash || '').match(/[#&]cfg=([^&]+)/);
+    if (!m) return null;
+    try {
+      let s = decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      const bytes = Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch (err) {
+      return null;
+    }
+  }
+  (() => {
+    const cfg = decodeShellCfg();
+    if (!cfg) return;
+    if (cfg.base) localStorage.setItem('chan_base', String(cfg.base).replace(/\/+$/, ''));
+    if (cfg.token) localStorage.setItem('chan_token', String(cfg.token));
+    // 从地址栏去掉 cfg，避免刷新时重复注入/泄露
+    const hash = (location.hash || '').replace(/[#&]cfg=[^&]+/, '').replace(/^#$/, '');
+    history.replaceState(null, '', location.pathname + location.search + hash);
+  })();
+
+  /* ---------- 状态 ---------- */
+  const state = {
+    serverBase: (localStorage.getItem('chan_base') || '').replace(/\/+$/, ''),
+    token: localStorage.getItem('chan_token') || '',
+    devices: [],
+    device: null,
+    deviceOnline: false,
+    recent: [],
+    jobs: [],
+    stats: null,
+    settings: null,
+    timer: null,
+    active: null,
+    ticker: null,
+    repeat: 1,
+    selectedMin: 25,
+    customMin: 30,
+    customOn: false,
+    historyFilter: 'all',
+    route: 'home',
+    sending: false,
+    sendingJob: null,
+    playingText: '',
+    devicesLoaded: false,
+    timerHintShown: false,
+    timerEpoch: 0,
+  };
+
+  const STATUS_TEXT = {
+    pending: '准备中',
+    sent: '已发送',
+    running: '进行中',
+    done: '完成',
+    error: '失败',
+    canceled: '已撤销',
+    pending_resend: '等待重连',
+    overtime: '超时中',
+    expired: '未处理',
+  };
+
+  /* ---------- 连接 / 错误 ---------- */
+  const apiBase = () => state.serverBase || location.origin;
+
+  function showBanner(msg) {
+    placeBanner();
+    $('#bannerText').textContent = msg;
+    $('#banner').hidden = false;
+  }
+  function hideBanner() {
+    $('#banner').hidden = true;
+  }
+  // 横幅不悬浮：插到当前页面的头部后面，跟内容一起排，永远不会盖住返回键和标题。
+  function placeBanner() {
+    const page = $('.page.on');
+    if (!page) return;
+    const header = page.querySelector('.home-head, .page-head');
+    if (header) header.insertAdjacentElement('afterend', $('#banner'));
+  }
+
+  async function api(path, opts = {}) {
+    const headers = Object.assign({ 'X-App-Token': state.token }, opts.headers || {});
+    let res;
+    try {
+      res = await fetch(apiBase() + path, Object.assign({}, opts, { headers }));
+    } catch (err) {
+      showBanner(`连不上 ${apiBase()}，检查服务端和网络`);
+      throw err;
+    }
+    if (res.ok) {
+      hideBanner();
+      return res.json();
+    }
+    const body = (await res.text()).slice(0, 200);
+    if (res.status === 401) showBanner('App Token 不正确，去设置里改一下');
+    throw new Error(res.status === 401 ? 'token 不对' : `${res.status} ${body}`);
+  }
+
+  let toastTimer = null;
+  function toast(msg, kind = '') {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.className = 'toast on' + (kind === 'err' ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, 2600);
+  }
+
+  /* ---------- 底部抽屉 ---------- */
+  function openSheet({ title, body = '', content = '', actions = [], onMount }) {
+    $('#sheetTitle').textContent = title;
+    $('#sheetBody').textContent = body;
+    $('#sheetContent').innerHTML = content;
+    const wrap = $('#sheetActions');
+    wrap.innerHTML = '';
+    actions.forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = a.kind || 'ghost';
+      b.textContent = a.label;
+      b.addEventListener('click', () => {
+        closeSheet();
+        if (a.onClick) a.onClick();
+      });
+      wrap.appendChild(b);
+    });
+    const bd = $('#sheetBackdrop');
+    bd.hidden = false;
+    requestAnimationFrame(() => bd.classList.add('on'));
+    document.body.classList.add('no-scroll');
+    if (onMount) onMount();
+  }
+  function closeSheet() {
+    const bd = $('#sheetBackdrop');
+    bd.classList.remove('on');
+    document.body.classList.remove('no-scroll');
+    setTimeout(() => {
+      if (!bd.classList.contains('on')) bd.hidden = true;
+    }, 220);
+  }
+  function openConfirm({ title, body, confirm, cancel, danger = false, onConfirm }) {
+    openSheet({
+      title,
+      body,
+      actions: [
+        { label: confirm, kind: danger ? 'danger-solid' : 'primary', onClick: onConfirm },
+        { label: cancel || '取消', kind: 'ghost' },
+      ],
+    });
+  }
+  $('#sheetBackdrop').addEventListener('click', (e) => {
+    if (e.target === $('#sheetBackdrop')) closeSheet();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#sheetBackdrop').hidden) closeSheet();
+  });
+
+  /* ---------- 设备 ---------- */
+  const deviceName = () => state.device?.name || '包子';
+
+  function heroStatusText() {
+    if (state.active) {
+      const total = state.active.duration_ms;
+      const remain = currentRemain();
+      if (remain <= 0) return `专注超时 · +${mmss(-remain)}`;
+      if (remain <= total * 0.2) return `准备收尾 · ${mmss(remain)}`;
+      return `专注中 · 剩余 ${mmss(remain)}`;
+    }
+    if (state.playingText) {
+      const t = state.playingText;
+      return `正在说 · ${t.length > 18 ? t.slice(0, 18) + '…' : t}`;
+    }
+    if (!state.devicesLoaded) return '正在读取设备状态…';
+    const d = state.device;
+    if (!d) return '把机器人开机，连上同一个 Wi-Fi';
+    return d.last_seen ? `最后心跳 ${relTime(d.last_seen)}` : '还没有收到心跳';
+  }
+
+  function renderHeroStatus() {
+    const el = $('#heroSub');
+    if (el) el.textContent = heroStatusText();
+  }
+
+  function pickDevice(devices) {
+    const want = new URLSearchParams(location.search).get('device');
+    return (want && devices.find((d) => d.id === want))
+      || devices.find((d) => d.online)
+      || devices[0]
+      || null;
+  }
+
+  async function refreshDevices() {
+    try {
+      const devices = await api('/api/devices');
+      state.devices = devices;
+      state.device = pickDevice(devices);
+      state.devicesLoaded = true;
+      renderDevice();
+      // 直接深链进 #teleop / 设备刚上线时，自动补一次会话启动
+      if (state.route === 'teleop' && !teleopState.active) enterTeleopPage();
+      return state.device;
+    } catch (err) {
+      state.devices = [];
+      state.device = null;
+      state.devicesLoaded = true;
+      renderDevice();
+      return null;
+    }
+  }
+
+  function renderDevice() {
+    const d = state.device;
+    const online = !!d && d.online;
+    state.deviceOnline = online;
+
+    const name = deviceName();
+    $('#homeName').textContent = name;
+    $('#homeName').title = name;
+    document.title = name + ' · Chan';
+    $('#hero').classList.toggle('offline', !online);
+    $('#hero').classList.toggle('no-device', !d);
+    $('#heroStatusText').textContent = d ? (online ? '在线' : '离线') : '未连接';
+    $('#heroFw').textContent = d?.fw ? `固件 ${d.fw}` : '';
+    const tip = $('#timerTipText');
+    if (tip) tip.textContent = deviceName();
+
+    setComposerEnabled(online);
+    renderSettingsDevice();
+    renderTimerStartState();
+    renderHeroStatus();
+  }
+
+  function setComposerEnabled(online) {
+    $('#sendBtn').disabled = !online || state.sending;
+    $('#composer').classList.toggle('offline', !online);
+    $('#composerHint').textContent = online ? '会念出来' : (state.device ? '设备离线' : '无设备');
+  }
+
+  function renderSettingsDevice() {
+    const box = $('#devCard');
+    if (!box) return;
+    const d = state.device;
+    if (!d) {
+      box.innerHTML = `<div class="empty small"><div class="empty-face"><i></i><i></i></div>
+        <b>还没有设备</b><p>设备连上后会出现在这里</p></div>`;
+      return;
+    }
+    const seen = d.last_seen ? fullTime(d.last_seen) : '—';
+    box.innerHTML = `
+      <div class="device-top">
+        <span class="mini-face ${d.online ? '' : 'off'}"><i></i><i></i></span>
+        <span class="device-id"><b>${esc(d.name || '未命名设备')}</b>
+          <small>${d.online ? '在线' : '离线'} · ${esc(relTime(d.last_seen))}</small></span>
+        <span class="pill ${d.online ? 'ok' : 'mute'}">${d.online ? '在线' : '离线'}</span>
+      </div>
+      <div class="kv">
+        <div class="kv-row"><span class="k">MAC</span><span class="v mono">${esc(d.id)}</span></div>
+        <div class="kv-row"><span class="k">固件</span><span class="v">${esc(d.fw || '未上报')}</span></div>
+        <div class="kv-row"><span class="k">最后心跳</span><span class="v">${esc(seen)}</span></div>
+      </div>`;
+  }
+
+  /* ---------- 任务展示 ---------- */
+  function jobTitle(j) {
+    if (j.type === 'timer') return j.payload?.task || j.payload?.label || '专注';
+    return j.payload?.text || '消息';
+  }
+  function jobSub(j, relative = false) {
+    const when = relative ? relTime(j.created_at) : hhmm(j.created_at);
+    if (j.type === 'timer') {
+      const plan = Math.round((j.payload?.duration_ms || 0) / 60000);
+      return `${plan} 分钟 · ${when}`;
+    }
+    const repeat = j.payload?.repeat || 1;
+    return `${repeat > 1 ? `重复 ${repeat} 遍 · ` : ''}${when}`;
+  }
+  function timerOutcome(j) {
+    if (j.status === 'done') {
+      if (j.outcome === 'early') return '提前完成';
+      if (j.outcome === 'late') return '超时收工';
+      return '完成';
+    }
+    if (j.status === 'canceled') return '已放弃';
+    if (j.status === 'expired') return '未处理';
+    return STATUS_TEXT[j.status] || j.status;
+  }
+  function statusClass(j) {
+    if (j.type === 'timer' && j.status === 'done') {
+      if (j.outcome === 'late') return 'warn';
+      return 'ok';
+    }
+    switch (j.status) {
+      case 'done': return 'ok';
+      case 'error': return 'bad';
+      case 'canceled':
+      case 'expired': return 'mute';
+      case 'overtime':
+      case 'pending_resend': return 'warn';
+      case 'running':
+      case 'sent':
+      case 'pending': return 'live';
+      default: return 'mute';
+    }
+  }
+  function jobRow(j, relative = false) {
+    const isTimer = j.type === 'timer';
+    const label = isTimer ? timerOutcome(j) : (STATUS_TEXT[j.status] || j.status);
+    return `<button type="button" class="row" data-job="${esc(j.id)}">
+      <span class="row-icon ${isTimer ? 'timer' : 'msg'}">${icon(isTimer ? 'timer' : 'message')}</span>
+      <span class="row-main">
+        <span class="row-title">${esc(jobTitle(j))}</span>
+        <span class="row-sub">${esc(jobSub(j, relative))}</span>
+      </span>
+      <span class="pill ${statusClass(j)}">${esc(label)}</span>
+    </button>`;
+  }
+  function emptyBlock(title, text, small = false) {
+    return `<div class="empty ${small ? 'small' : ''}">
+      <div class="empty-face"><i></i><i></i></div>
+      <b>${esc(title)}</b><p>${esc(text)}</p></div>`;
+  }
+
+  /* ---------- 首页：最近 / 工具 ---------- */
+  async function loadRecent() {
+    try {
+      const [jobs, stats] = await Promise.all([
+        api('/api/jobs?limit=3'),
+        api('/api/maintenance/stats'),
+      ]);
+      state.recent = jobs;
+      state.stats = stats;
+      renderRecent();
+      renderTiles();
+    } catch (err) {
+      if (state.route === 'home') $('#recentList').innerHTML = emptyBlock('读取失败', err.message, true);
+    }
+  }
+
+  function renderRecent() {
+    const box = $('#recentList');
+    if (!state.recent.length) {
+      box.innerHTML = emptyBlock('还没有记录', `让${deviceName()}说句话，或开始一次专注`, true);
+      return;
+    }
+    box.innerHTML = state.recent.map((j) => jobRow(j, true)).join('');
+  }
+
+  function renderTiles() {
+    $('#tileHistorySub').textContent = state.stats ? `${state.stats.jobs} 条记录` : '查看全部';
+    renderTimerTile();
+  }
+
+  /* ---------- 发消息 ---------- */
+  function autosize() {
+    const el = $('#sayText');
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 168) + 'px';
+  }
+  function setSendStatus(text, kind = '') {
+    const el = $('#sendStatus');
+    el.textContent = text;
+    el.className = 'status-line' + (kind ? ' ' + kind : '');
+  }
+  function setRepeat(v) {
+    state.repeat = Math.max(1, Math.min(20, v));
+    $('#repeatVal').textContent = state.repeat;
+  }
+
+  $('#sayText').addEventListener('input', autosize);
+  $('#repeatMinus').addEventListener('click', () => setRepeat(state.repeat - 1));
+  $('#repeatPlus').addEventListener('click', () => setRepeat(state.repeat + 1));
+  $('#sendBtn').addEventListener('click', sendMessage);
+
+  async function sendMessage() {
+    const text = $('#sayText').value.trim();
+    if (!text) { $('#sayText').focus(); return; }
+    if (!state.deviceOnline) { toast('设备离线，消息发不出去', 'err'); return; }
+
+    state.sending = true;
+    $('#sendBtn').disabled = true;
+    setSendStatus('合成中…', '');
+    try {
+      const job = await api('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, repeat: state.repeat, device_id: state.device?.id }),
+      });
+      setSendStatus(`已发送，${deviceName()}正在说`, 'ok');
+      $('#sayText').value = '';
+      autosize();
+      state.sendingJob = job.id;
+      state.playingText = text;
+      renderHeroStatus();
+      pollJob(job.id);
+      loadRecent();
+    } catch (err) {
+      setSendStatus(`发送失败：${err.message}`, 'bad');
+      toast('发送失败', 'err');
+    } finally {
+      state.sending = false;
+      $('#sendBtn').disabled = !state.deviceOnline;
+    }
+  }
+
+  async function pollJob(id) {
+    for (let i = 0; i < 90; i++) {
+      await sleep(1000);
+      if (state.sendingJob !== id) return;
+      try {
+        const job = await api('/api/jobs/' + encodeURIComponent(id));
+        if (job.status === 'pending') setSendStatus('准备中…', '');
+        else if (job.status === 'sent' || job.status === 'running') setSendStatus(`${deviceName()}正在说…`, 'ok');
+        else if (job.status === 'pending_resend') {
+          state.playingText = '';
+          renderHeroStatus();
+          setSendStatus('设备重连后会补播', 'warn');
+        } else if (job.status === 'done') {
+          state.playingText = '';
+          renderHeroStatus();
+          setSendStatus('已播报完成', 'ok');
+          loadRecent(); loadHistory();
+          return;
+        } else if (job.status === 'error') {
+          state.playingText = '';
+          renderHeroStatus();
+          setSendStatus(`播放失败：${job.error || '未知原因'}`, 'bad');
+          loadRecent(); loadHistory();
+          return;
+        } else if (job.status === 'canceled') {
+          state.playingText = '';
+          renderHeroStatus();
+          setSendStatus('已撤销', '');
+          return;
+        }
+      } catch (err) {
+        return;
+      }
+    }
+  }
+
+  /* ---------- 番茄钟 ---------- */
+  const RING_R = 132;
+  const RING_C = 2 * Math.PI * RING_R;
+  let customDraft = 30;
+
+  const ring = $('#ringProgress');
+  ring.style.strokeDasharray = RING_C;
+  ring.style.strokeDashoffset = RING_C;
+
+  function currentMinutes() {
+    return state.customOn ? state.customMin : state.selectedMin;
+  }
+  function currentRemain() {
+    if (!state.active) return 0;
+    return state.active.anchorRemain - (performance.now() - state.active.anchorAt);
+  }
+  function timerPhase(remain, total) {
+    if (remain <= 0) return 'overtime';
+    if (remain <= total * 0.2) return 'fuse';
+    return 'focus';
+  }
+  function renderTimerStartState() {
+    const btn = $('#startTimer');
+    if (!btn) return;
+    btn.disabled = !state.deviceOnline;
+    const msg = $('#timerMsg');
+    const hint = state.deviceOnline
+      ? ''
+      : (state.device ? '设备离线，暂时不能开始专注' : '还没有设备连接');
+    if (hint) {
+      msg.textContent = hint;
+      msg.className = 'status-line center warn';
+      state.timerHintShown = true;
+    } else if (state.timerHintShown) {
+      msg.textContent = '';
+      msg.className = 'status-line center';
+      state.timerHintShown = false;
+    }
+  }
+  function setTimerMsg(text, kind = '') {
+    state.timerHintShown = false;
+    const el = $('#timerMsg');
+    el.textContent = text;
+    el.className = 'status-line center' + (kind ? ' ' + kind : '');
+  }
+
+  function renderTimerIdle() {
+    $('#durValue').textContent = currentMinutes();
+    $$('#presetRow .preset').forEach((b) => {
+      b.classList.toggle('on', !state.customOn && Number(b.dataset.min) === state.selectedMin);
+    });
+    $('#customPreset').classList.toggle('on', state.customOn);
+    $('#customPresetLabel').textContent = state.customOn
+      ? `自定义 · ${state.customMin} 分钟`
+      : '自定义时长';
+  }
+
+  function renderTimerPage() {
+    const running = !!state.active;
+    $('#timerIdle').hidden = running;
+    $('#timerRun').hidden = !running;
+    if (running) {
+      $('#runTask').textContent = state.active.task ? `「${state.active.task}」` : '';
+      renderTimerTick();
+    } else {
+      renderTimerIdle();
+      renderTodayStats();
+      renderTimerStartState();
+    }
+  }
+
+  function renderTimerTick() {
+    if (!state.active) return;
+    const total = state.active.duration_ms;
+    const remain = currentRemain();
+    const over = Math.max(0, -remain);
+    const phase = timerPhase(remain, total);
+    const frac = Math.min(1, Math.max(0, (total - Math.max(0, remain)) / total));
+
+    $('#bigTime').textContent = over > 0 ? '+' + mmss(over) : mmss(remain);
+    $('#bigTime').classList.toggle('over', over > 0);
+
+    const pill = $('#phasePill');
+    pill.className = 'phase-pill' + (phase === 'fuse' ? ' fuse' : phase === 'overtime' ? ' overtime' : '');
+    pill.textContent = phase === 'fuse' ? '收尾' : phase === 'overtime' ? '超时' : '专注';
+
+    ring.style.strokeDashoffset = RING_C * (1 - frac);
+    ring.style.stroke = phase === 'overtime'
+      ? 'var(--red)'
+      : phase === 'fuse'
+        ? 'var(--amber)'
+        : 'url(#ringGrad)';
+    $('#ringWrap').classList.toggle('over', over > 0);
+
+    const sub = $('#ringSub');
+    if (over > 0) {
+      sub.textContent = `已超时 ${mmss(over)}`;
+      sub.classList.add('over');
+    } else {
+      const end = new Date(Date.now() + Math.max(0, remain));
+      sub.textContent = `${pad(end.getHours())}:${pad(end.getMinutes())} 结束`;
+      sub.classList.remove('over');
+    }
+
+    $('#finishTimer').textContent = over > 0 ? '我知道了' : '完成';
+    $('#abandonTimer').hidden = over > 0;
+
+    // 到点只刷新一次历史；继续留在这里显示超时，等用户表态
+    if (over > 0 && !state.active.noted) {
+      state.active.noted = true;
+      loadHistory();
+    }
+    renderHeroStatus();
+  }
+
+  function renderTimerTile() {
+    const tile = $('#tileTimer');
+    if (!tile) return;
+    if (state.active) {
+      const remain = currentRemain();
+      const total = state.active.duration_ms;
+      const frac = Math.min(1, Math.max(0, (total - Math.max(0, remain)) / total));
+      tile.classList.add('running');
+      $('#tileTimerTitle').textContent = remain <= 0 ? '专注超时' : '专注中';
+      $('#tileTimerSub').textContent =
+        `${state.active.task || state.active.label || '专注'} · ${remain <= 0 ? '+' + mmss(-remain) : '剩余 ' + mmss(remain)}`;
+      $('#miniRing').style.setProperty('--p', (frac * 100).toFixed(1));
+    } else {
+      tile.classList.remove('running');
+      $('#tileTimerTitle').textContent = '番茄钟';
+      $('#tileTimerSub').textContent = `开始一次 ${currentMinutes()} 分钟的专注`;
+    }
+  }
+
+  function startTicker() {
+    stopTicker();
+    state.ticker = setInterval(() => {
+      renderTimerTick();
+      renderTimerTile();
+    }, 200);
+  }
+  function stopTicker() {
+    if (state.ticker) {
+      clearInterval(state.ticker);
+      state.ticker = null;
+    }
+  }
+
+  function enterRun(t) {
+    state.timerEpoch += 1;
+    const same = state.active && state.active.job_id === t.job_id;
+    state.timer = t;
+    // 服务器给的是「剩余」和「已超时」两个量；合成一个有符号的剩余时间，
+    // 中途打开页面时才不会把已经超时的几分钟丢掉（只从 0 开始数）。
+    state.active = {
+      job_id: t.job_id,
+      duration_ms: t.duration_ms,
+      label: t.label || '专注',
+      task: t.task || '',
+      anchorAt: performance.now(),
+      anchorRemain: t.remaining_ms - (t.overtime_ms || 0),
+      noted: same ? !!state.active.noted : false,
+    };
+    startTicker();
+    renderTimerPage();
+    renderTimerTile();
+    renderHeroStatus();
+  }
+
+  function exitRun() {
+    state.timerEpoch += 1;
+    state.active = null;
+    state.timer = null;
+    stopTicker();
+    renderTimerPage();
+    renderTimerTile();
+    renderHeroStatus();
+  }
+
+  async function syncActive() {
+    const target = new URLSearchParams(location.search).get('device') || state.device?.id;
+    if (!target) return;
+    // 请求发出后用户可能已经点了完成/放弃，或开始了新计时；
+    // 回来的旧响应不能再把状态改回去。
+    const epoch = state.timerEpoch;
+    try {
+      const r = await api('/api/timers/active?device_id=' + encodeURIComponent(target));
+      if (epoch !== state.timerEpoch) return;
+      const t = r.timer;
+      if (!t) {
+        if (state.active) exitRun();
+        else {
+          state.timer = null;
+          renderTimerTile();
+          if (state.route === 'timer') renderTimerPage();
+        }
+        return;
+      }
+      enterRun(t);
+    } catch (err) {
+      // 设备离线 / 服务端短暂不可用时保持本地倒计时，不把计时清零
+    }
+  }
+
+  function openCustomDuration() {
+    customDraft = state.customMin;
+    openSheet({
+      title: '自定义时长',
+      content: `<div class="custom-picker">
+        <button type="button" class="round-btn" id="customMinus" aria-label="减少">${icon('minus')}</button>
+        <input id="customInput" type="number" min="1" max="240" step="1" inputmode="numeric" value="${customDraft}">
+        <button type="button" class="round-btn" id="customPlus" aria-label="增加">${icon('plus')}</button>
+      </div>
+      <p class="hint" style="text-align:center">1–240 分钟</p>`,
+      actions: [
+        { label: '确定', kind: 'primary', onClick: () => {
+          state.customMin = Math.max(1, Math.min(240, customDraft));
+          state.customOn = true;
+          renderTimerIdle();
+          renderTimerTile();
+        } },
+        { label: '取消', kind: 'ghost' },
+      ],
+      onMount: () => {
+        const input = $('#customInput');
+        const set = (v) => {
+          customDraft = Math.max(1, Math.min(240, v || 1));
+          input.value = customDraft;
+        };
+        $('#customMinus').addEventListener('click', () => set(customDraft - 1));
+        $('#customPlus').addEventListener('click', () => set(customDraft + 1));
+        input.addEventListener('input', () => {
+          const v = parseInt(input.value, 10);
+          customDraft = Number.isFinite(v) ? Math.max(1, Math.min(240, v)) : 1;
+        });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); $('#sheetActions .primary').click(); }
+        });
+        input.focus();
+        input.select();
+      },
+    });
+  }
+
+  $('#presetRow').addEventListener('click', (e) => {
+    const b = e.target.closest('.preset');
+    if (!b) return;
+    state.selectedMin = Number(b.dataset.min);
+    state.customOn = false;
+    renderTimerIdle();
+    renderTimerTile();
+    setTimerMsg('');
+  });
+  $('#customPreset').addEventListener('click', openCustomDuration);
+  $('#demoMinute').addEventListener('click', () => {
+    state.customMin = 1;
+    state.customOn = true;
+    renderTimerIdle();
+    renderTimerTile();
+    setTimerMsg('已设为 1 分钟演示');
+  });
+  $('#taskInput').addEventListener('input', () => {
+    $('#taskCount').textContent = $('#taskInput').value.length;
+  });
+
+  $('#startTimer').addEventListener('click', async () => {
+    if (!state.deviceOnline) { toast('设备离线，暂时不能开始', 'err'); return; }
+    const minutes = currentMinutes();
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) {
+      setTimerMsg('时长要在 1–240 分钟之间', 'bad');
+      return;
+    }
+    const btn = $('#startTimer');
+    btn.disabled = true;
+    btn.textContent = '正在开始…';
+    setTimerMsg('');
+    try {
+      const res = await api('/api/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          duration_ms: minutes * 60000,
+          label: '专注',
+          task: ($('#taskInput').value || '').trim().slice(0, 20),
+          device_id: state.device?.id,
+        }),
+      });
+      enterRun(res.timer);
+      toast('已开始专注');
+    } catch (err) {
+      if (String(err.message).includes('409')) {
+        setTimerMsg('已经有一个专注在进行，正在同步…', 'warn');
+        await syncActive();
+      } else {
+        setTimerMsg(`开始失败：${err.message}`, 'bad');
+      }
+    } finally {
+      btn.textContent = '开始专注';
+      renderTimerStartState();
+    }
+  });
+
+  $('#finishTimer').addEventListener('click', () => {
+    if (!state.active) return;
+    const remain = currentRemain();
+    if (remain > 0) {
+      const focused = Math.max(1, Math.round((state.active.duration_ms - remain) / 60000));
+      openConfirm({
+        title: '现在结束？',
+        body: `已经专注 ${focused} 分钟，会记为「提前完成」。`,
+        confirm: '结束专注',
+        cancel: '继续专注',
+        onConfirm: doFinish,
+      });
+    } else {
+      doFinish();
+    }
+  });
+
+  async function doFinish() {
+    if (!state.active) return;
+    const id = state.active.job_id;
+    $('#runMsg').textContent = '收尾中…';
+    try {
+      const job = await api('/api/jobs/' + encodeURIComponent(id) + '/finish', { method: 'POST' });
+      toast(job.outcome === 'early' ? '已记为提前完成' : job.outcome === 'late' ? '已记下，辛苦了' : '已完成');
+      exitRun();
+      loadHistory(); loadRecent();
+    } catch (err) {
+      $('#runMsg').textContent = `操作失败：${err.message}`;
+    }
+  }
+
+  $('#abandonTimer').addEventListener('click', () => {
+    if (!state.active) return;
+    openConfirm({
+      title: '放弃这次专注？',
+      body: '这次不会计入完成数。',
+      confirm: '放弃',
+      cancel: '再坚持一下',
+      danger: true,
+      onConfirm: async () => {
+        const id = state.active.job_id;
+        $('#runMsg').textContent = '放弃中…';
+        try {
+          await api('/api/jobs/' + encodeURIComponent(id) + '/cancel', { method: 'POST' });
+          toast('已放弃');
+          exitRun();
+          loadHistory(); loadRecent();
+        } catch (err) {
+          $('#runMsg').textContent = `操作失败：${err.message}`;
+        }
+      },
+    });
+  });
+
+  /* ---------- 遥控台 ---------- */
+  // 会话模型：进页面即开流；离开页面/切后台 → 关流 + 回正。
+  // 页面开着时不因“无操作”关闭（用户 2026-11-12 反馈），只靠 15s keepalive 保活；
+  // 断网/App 失联 90s 由设备侧兜底关闭。
+  // 视频走轮询 last_frame.jpg（no-store），控制走 /api/teleop/*。
+  const teleopState = {
+    active: false,
+    timer: null,
+    loopTimer: null,
+    keepaliveTimer: null,
+    lastSend: 0,
+    lastTick: 0,
+    sending: false,
+    x: 0,          // 摇杆位置（用户意图）
+    y: -1,
+    cmdYaw: 0,     // 实际下发的目标（限速后追向摇杆）
+    cmdPitch: 5,
+    lastSentYaw: null,
+    lastSentPitch: null,
+    sheetUrl: null,
+    sheetDownloadUrl: null,
+    thumbUrls: [],
+    photoSeq: 0,
+    frameTimes: [],
+  };
+
+  function teleopDeviceId() {
+    return state.device?.id;
+  }
+
+  function teleopHint(text) {
+    const el = $('#teleopStageHint');
+    if (el) {
+      el.textContent = text;
+      el.hidden = false;
+    }
+  }
+
+  function teleopHideHint() {
+    const el = $('#teleopStageHint');
+    if (el) el.hidden = true;
+  }
+
+  async function teleopPost(path, body) {
+    return api(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // 摇杆 y∈[-1,1] → 俯仰角（度）：底部 5°（水平），顶部 85°
+  // 注意单位是“度”（协议约定 5–85），不是舵机的 0.1° 单位
+  function teleopPitchDeg(y) {
+    return 5 + ((y + 1) / 2) * 80;
+  }
+
+  // 绝对位置摇杆（方形盘）：knob 位置 = 目标角度；x/y 独立，底边全宽，
+  // 所以 pitch=5° 时 yaw 仍可 ±90°。实际下发值以 80/60 °/s 的斜率追过去，
+  // 角上 ±90°/85° 也不会一步甩过去（SCS0009 额定约 600°/s）。
+  const TELEOP_YAW_RATE = 80;    // deg/s
+  const TELEOP_PITCH_RATE = 60;  // deg/s
+  const TELEOP_SEND_MS = 100;    // 10Hz
+  const TELEOP_SPEED = 500;      // 舵机弹簧速度（0–1000）
+
+  function clampNum(v, lo, hi) {
+    return Math.min(hi, Math.max(lo, v));
+  }
+
+  function moveToward(cur, target, step) {
+    if (Math.abs(target - cur) <= step) return target;
+    return cur + Math.sign(target - cur) * step;
+  }
+
+  function teleopDesiredAngles() {
+    return {
+      yaw: clampNum(teleopState.x * 90, -90, 90),
+      pitch: clampNum(teleopPitchDeg(teleopState.y), 5, 85),
+    };
+  }
+
+  function resetTeleopControls() {
+    teleopState.x = 0;
+    teleopState.y = -1;  // y=-1 → 俯仰 5°（水平），和固件遥控初始位一致
+    teleopState.cmdYaw = 0;
+    teleopState.cmdPitch = 5;
+    teleopState.lastSentYaw = null;
+    teleopState.lastSentPitch = null;
+    teleopState.sending = false;
+    renderTeleopKnob();
+    updateTeleopReadout();
+  }
+
+  function renderTeleopKnob() {
+    const pad = $('#teleopStick');
+    const knob = $('#teleopKnob');
+    if (!pad || !knob) return;
+    const rect = pad.getBoundingClientRect();
+    if (!rect.width) return;  // 页面还没显示，进页面后再渲染一次
+    const edge = knob.offsetWidth / 2 + 6;
+    const maxX = rect.width / 2 - edge;
+    const maxY = rect.height / 2 - edge;
+    // 2:1 宽盘：x/y 各自映射到半宽/半高
+    const px = clampNum(teleopState.x, -1, 1) * maxX;
+    const py = -clampNum(teleopState.y, -1, 1) * maxY;
+    knob.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+    const yaw = Math.round(clampNum(teleopState.x * 90, -90, 90));
+    const pitch = Math.round(teleopPitchDeg(teleopState.y));
+    let stateText = teleopState.active ? '可拖动' : '待命';
+    let atLimit = false;
+    if (Math.abs(yaw) >= 89) {
+      stateText = '左右限位';
+      atLimit = true;       // ±90° 是线缆限制，提示一下
+    } else if (pitch >= 84) {
+      stateText = '俯仰上限';
+      atLimit = true;
+    } else if (pitch <= 6) {
+      stateText = '水平 5°';  // 初始位就在下限，别标成“已到限位”
+    }
+    pad.classList.toggle('at-limit', atLimit);
+    const stateEl = $('#teleopStickState');
+    if (stateEl) stateEl.textContent = stateText;
+  }
+
+  function updateTeleopReadout() {
+    const yawEl = $('#teleopYawVal');
+    const pitchEl = $('#teleopPitchVal');
+    if (yawEl) yawEl.textContent = `${Math.round(teleopState.cmdYaw)}°`;
+    if (pitchEl) pitchEl.textContent = `${Math.round(teleopState.cmdPitch)}°`;
+  }
+
+  function setTeleopDesired(x, y) {
+    // 方形盘：x/y 独立 clamp。底边保持全宽，pitch=5° 时 yaw 仍可 ±90°；
+    // 不再做圆形归一化——那会把"底边横扫"推到上方，正是用户反馈的问题。
+    teleopState.x = clampNum(x, -1, 1);
+    teleopState.y = clampNum(y, -1, 1);
+    renderTeleopKnob();
+  }
+
+  function setupTeleopStick() {
+    const pad = $('#teleopStick');
+    if (!pad) return;
+    let pointerId = null;
+    const update = (e) => {
+      const rect = pad.getBoundingClientRect();
+      if (!rect.width) return;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const x = (e.clientX - cx) / (rect.width / 2);
+      const y = -(e.clientY - cy) / (rect.height / 2);
+      setTeleopDesired(x, y);
+    };
+    pad.addEventListener('pointerdown', (e) => {
+      if (!teleopState.active || pointerId !== null) return;
+      pointerId = e.pointerId;
+      try { pad.setPointerCapture(pointerId); } catch (err) { /* 旧 WebView */ }
+      pad.classList.add('dragging');
+      update(e);
+      e.preventDefault();
+    });
+    pad.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== pointerId) return;
+      update(e);
+      e.preventDefault();
+    });
+    const end = (e) => {
+      if (e.pointerId !== pointerId) return;
+      pointerId = null;
+      pad.classList.remove('dragging');
+    };
+    pad.addEventListener('pointerup', end);
+    pad.addEventListener('pointercancel', end);
+    pad.addEventListener('lostpointercapture', end);
+    // 键盘微调：桌面浏览器调试和手机外接键盘都能用
+    pad.addEventListener('keydown', (e) => {
+      if (!teleopState.active) return;
+      const step = e.shiftKey ? 0.1 : 0.03;
+      const moves = {
+        ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+        ArrowUp: [0, step], ArrowDown: [0, -step],
+      };
+      const d = moves[e.key];
+      if (!d) return;
+      setTeleopDesired(teleopState.x + d[0], teleopState.y + d[1]);
+      e.preventDefault();
+    });
+  }
+
+  function startTeleopLoop() {
+    stopTeleopLoop();
+    teleopState.lastTick = performance.now();
+    teleopState.loopTimer = setInterval(teleopTick, 50);
+  }
+
+  function stopTeleopLoop() {
+    clearInterval(teleopState.loopTimer);
+    teleopState.loopTimer = null;
+  }
+
+  function teleopTick() {
+    if (!teleopState.active || document.hidden) return;
+    const now = performance.now();
+    const dt = Math.min(0.2, (now - teleopState.lastTick) / 1000);
+    teleopState.lastTick = now;
+    const target = teleopDesiredAngles();
+    teleopState.cmdYaw = moveToward(teleopState.cmdYaw, target.yaw, TELEOP_YAW_RATE * dt);
+    teleopState.cmdPitch = moveToward(teleopState.cmdPitch, target.pitch, TELEOP_PITCH_RATE * dt);
+    updateTeleopReadout();
+    maybeSendTeleopMove();
+  }
+
+  // 单飞行 + 目标合并：慢网下也只有一个 /move 在途，避免两个 POST 乱序让头回跳。
+  function maybeSendTeleopMove() {
+    if (!teleopState.active || teleopState.sending) return;
+    const now = Date.now();
+    if (now - teleopState.lastSend < TELEOP_SEND_MS) return;
+    const yaw = Math.round(teleopState.cmdYaw);
+    const pitch = Math.round(teleopState.cmdPitch);
+    if (teleopState.lastSentYaw === yaw && teleopState.lastSentPitch === pitch) return;
+    const id = teleopDeviceId();
+    if (!id) return;
+    teleopState.sending = true;
+    teleopState.lastSend = now;
+    teleopPost('/api/teleop/move', {
+      device_id: id,
+      yaw: clampNum(yaw, -90, 90),
+      pitch: clampNum(pitch, 5, 85),
+      speed: TELEOP_SPEED,
+    }).then(() => {
+      teleopState.lastSentYaw = yaw;
+      teleopState.lastSentPitch = pitch;
+    }).catch(async (err) => {
+      if (String(err.message).includes('409')) {
+        toast('设备离线，遥控已断开', 'err');
+        await teleopStop({ send: false });
+        teleopHint('设备离线，遥控已断开');
+      }
+    }).finally(() => {
+      teleopState.sending = false;
+    });
+  }
+
+  // 页面开着就保活：设备只在 90 秒收不到任何报文时才关闭（断网/App 崩溃兜底）
+  function startTeleopKeepalive() {
+    clearInterval(teleopState.keepaliveTimer);
+    teleopState.keepaliveTimer = setInterval(async () => {
+      if (!teleopState.active || document.hidden) return;
+      const id = teleopDeviceId();
+      if (!id) return;
+      try {
+        await teleopPost('/api/teleop/keepalive', { device_id: id });
+      } catch (err) {
+        /* 网络抖动：下一轮再试；设备侧 90s 兜底 */
+      }
+    }, 15000);
+  }
+
+  async function enterTeleopPage() {
+    if (teleopState.active) {
+      renderTeleopKnob();
+      return;
+    }
+    resetTeleopControls();
+    stopTeleopFramePolling();
+    stopTeleopLoop();
+    teleopHint('正在连接画面…');
+
+    await syncActive();
+    if (state.active) {
+      teleopHint('专注中，先结束计时再遥控');
+      return;
+    }
+    if (!teleopDeviceId()) {
+      teleopHint('还没有设备连接');
+      return;
+    }
+    if (!state.deviceOnline) {
+      teleopHint('设备离线，开机并联网后再来');
+      return;
+    }
+
+    try {
+      await teleopPost('/api/teleop/start', { device_id: teleopDeviceId() });
+    } catch (err) {
+      teleopHint('开流失败：' + err.message);
+      return;
+    }
+    teleopState.active = true;
+    teleopState.frameTimes = [];
+    $('#teleopFps').textContent = '—';
+    $('#teleopAge').textContent = '等待画面';
+    requestAnimationFrame(renderTeleopKnob);
+    startTeleopFramePolling();
+    startTeleopKeepalive();
+    startTeleopLoop();
+    loadTeleopPhotos();
+  }
+
+  async function teleopStop({ send = true } = {}) {
+    const id = teleopDeviceId();
+    const wasActive = teleopState.active;
+    teleopState.active = false;
+    stopTeleopLoop();
+    clearInterval(teleopState.keepaliveTimer);
+    teleopState.keepaliveTimer = null;
+    stopTeleopFramePolling();
+    if (teleopState.sheetUrl) {
+      URL.revokeObjectURL(teleopState.sheetUrl);
+      teleopState.sheetUrl = null;
+    }
+    teleopState.sheetDownloadUrl = null;
+    if (send && wasActive && id) {
+      try {
+        await teleopPost('/api/teleop/end', { device_id: id });
+      } catch (err) {
+        /* 设备可能已经离线，忽略 */
+      }
+    }
+  }
+
+  function stopTeleopFramePolling() {
+    clearTimeout(teleopState.timer);
+    teleopState.timer = null;
+  }
+
+  function startTeleopFramePolling() {
+    let misses = 0;
+    const tick = async () => {
+      if (!teleopState.active) return;
+      const id = teleopDeviceId();
+      if (!id) return;
+      try {
+        const url = apiBase() + `/api/devices/${id}/last_frame.jpg?ts=${Date.now()}`;
+        const res = await fetch(url, {
+          headers: { 'X-App-Token': state.token },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          misses = 0;
+          const blob = await res.blob();
+          const next = URL.createObjectURL(blob);
+          const img = $('#teleopFrame');
+          const prev = img.dataset.objUrl;
+          img.onload = () => {
+            if (prev) URL.revokeObjectURL(prev);
+          };
+          img.src = next;
+          img.dataset.objUrl = next;
+          img.hidden = false;
+          teleopHideHint();
+          const now = Date.now();
+          teleopState.frameTimes.push(now);
+          teleopState.frameTimes = teleopState.frameTimes.filter((t) => now - t < 3000);
+          $('#teleopFps').textContent = `${(teleopState.frameTimes.length / 3).toFixed(1)} fps`;
+          $('#teleopAge').textContent = '画面已连接';
+        } else if (res.status === 404) {
+          misses += 1;
+          if (misses >= 12) teleopHint('等待第一帧…（设备可能未进入遥控模式）');
+        } else if (res.status === 401) {
+          showBanner('App Token 不正确，去设置里改一下');
+        }
+      } catch (err) {
+        /* 网络抖动：下一轮再试 */
+      }
+      if (teleopState.active) teleopState.timer = setTimeout(tick, 250);
+    };
+    tick();
+  }
+
+  async function teleopCenter() {
+    const id = teleopDeviceId();
+    if (!id) return;
+    resetTeleopControls();
+    try {
+      await teleopPost('/api/teleop/center', { device_id: id });
+      toast('已回正');
+    } catch (err) {
+      toast('回正失败：' + err.message, 'err');
+    }
+  }
+
+  async function teleopScan() {
+    const id = teleopDeviceId();
+    if (!id) return;
+    // 环视结束固件会回到 0°/5°，这里同步把摇杆归位，避免界面和实际姿态不一致
+    resetTeleopControls();
+    try {
+      await teleopPost('/api/teleop/scan', { device_id: id });
+      toast('环视中…（结束后回到水平）');
+    } catch (err) {
+      toast('环视失败：' + err.message, 'err');
+    }
+  }
+
+  async function teleopPhotoBlobUrl(url) {
+    const res = await fetch(apiBase() + url, {
+      headers: { 'X-App-Token': state.token },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('photo ' + res.status);
+    return URL.createObjectURL(await res.blob());
+  }
+
+  // 下载链接用短时签名：WebView 把 <a download> 当导航时不会带自定义头，
+  // 签名 URL 让服务端在这条请求上不再依赖 X-App-Token。
+  async function teleopPhotoDownloadUrl(url) {
+    const res = await fetch(apiBase() + url + '/download_url', {
+      headers: { 'X-App-Token': state.token },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('download url ' + res.status);
+    const data = await res.json();
+    return data.url || null;
+  }
+
+  function teleopIsShell() {
+    return window.__CHAN_SHELL__ === true;
+  }
+
+  function teleopIsAndroidWebView() {
+    return /; wv\)/i.test(navigator.userAgent || '');
+  }
+
+  async function teleopSavePhoto(url, name = '') {
+    if (!url) return;
+    if (teleopIsShell()) {
+      // 壳内：优先用短时签名 URL（不依赖自定义头），旧 APK/签名失败时回退到带 token 的路径
+      const target = teleopState.sheetDownloadUrl || `${url}?download=1`;
+      const abs = new URL(target, location.href);
+      const a = document.createElement('a');
+      a.href = abs.href;
+      a.download = name || '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // 壳内的下载提示由 MainActivity 的 Toast 负责（带文件名），这里不再重复
+      return;
+    }
+    if (teleopIsAndroidWebView()) {
+      // 旧 APK 没有 DownloadListener，WebView 不会保存 blob 下载
+      toast('请安装新版 StackChan App 后再保存', 'err');
+      return;
+    }
+    // 浏览器：直接下载已经取回的大图 blob，避免二次请求和异步手势问题
+    const a = document.createElement('a');
+    a.href = teleopState.sheetUrl || url;
+    a.download = name || 'chan-photo.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast('已保存');
+  }
+
+  async function openTeleopPhotoSheet(url, name = '') {
+    const [src, downloadUrl] = await Promise.all([
+      teleopPhotoBlobUrl(url),
+      teleopPhotoDownloadUrl(url).catch(() => null),
+    ]);
+    if (teleopState.sheetUrl) URL.revokeObjectURL(teleopState.sheetUrl);
+    teleopState.sheetUrl = src;
+    teleopState.sheetDownloadUrl = downloadUrl;
+    openSheet({
+      title: '照片',
+      content: `<img class="photo-big" src="${src}" alt="">`,
+      actions: [
+        { label: '保存到手机', kind: 'primary', onClick: () => teleopSavePhoto(url, name) },
+        { label: '关闭', kind: 'ghost' },
+      ],
+    });
+  }
+
+  async function loadTeleopPhotos() {
+    const id = teleopDeviceId();
+    const box = $('#teleopPhotos');
+    if (!id || !box) return;
+    const seq = ++teleopState.photoSeq;
+    try {
+      const photos = await api(`/api/devices/${id}/photos?limit=8`);
+      if (seq !== teleopState.photoSeq) return;  // 已经有更新的请求，丢弃这次结果
+      if (!photos.length) {
+        teleopState.thumbUrls.forEach((u) => URL.revokeObjectURL(u));
+        teleopState.thumbUrls = [];
+        box.innerHTML = '<div class="empty small"><b>还没有照片</b><p>按上面的「拍照」试试</p></div>';
+        return;
+      }
+      const srcs = [];
+      const items = await Promise.all(
+        photos.map(async (p) => {
+          try {
+            const src = await teleopPhotoBlobUrl(p.url);
+            srcs.push(src);
+            return `<button type="button" class="shot" data-url="${esc(p.url)}" data-name="${esc(p.name)}"><img src="${src}" alt=""></button>`;
+          } catch (err) {
+            return '';
+          }
+        })
+      );
+      if (seq !== teleopState.photoSeq) {
+        srcs.forEach((u) => URL.revokeObjectURL(u));
+        return;
+      }
+      // 旧的缩略图 blob 已经不再被 DOM 引用，替换前统一释放
+      teleopState.thumbUrls.forEach((u) => URL.revokeObjectURL(u));
+      teleopState.thumbUrls = srcs;
+      box.innerHTML = items.join('') || '<div class="empty small"><b>照片读取失败</b></div>';
+    } catch (err) {
+      if (seq === teleopState.photoSeq) {
+        box.innerHTML = '<div class="empty small"><b>照片读取失败</b></div>';
+      }
+    }
+  }
+
+  function clearTeleopPhotos() {
+    const id = teleopDeviceId();
+    if (!id) return;
+    openConfirm({
+      title: '清空相册？',
+      body: '会删除这台设备的全部照片，无法恢复。平时服务端会自动保留最近 100 张 / 30 天，这里可以立即清空。',
+      confirm: '清空',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await api(`/api/devices/${id}/photos`, { method: 'DELETE' });
+          teleopState.thumbUrls.forEach((u) => URL.revokeObjectURL(u));
+          teleopState.thumbUrls = [];
+          if (teleopState.sheetUrl) {
+            URL.revokeObjectURL(teleopState.sheetUrl);
+            teleopState.sheetUrl = null;
+          }
+          teleopState.sheetDownloadUrl = null;
+          toast(`已删除 ${res.deleted || 0} 张`);
+          loadTeleopPhotos();
+        } catch (err) {
+          toast('清空失败：' + err.message, 'err');
+        }
+      },
+    });
+  }
+
+  async function teleopSnap() {
+    const id = teleopDeviceId();
+    if (!id) return;
+    const snapBtn = $('#teleopSnap');
+    snapBtn.disabled = true;
+    try {
+      const info = await teleopPost('/api/teleop/photo', { device_id: id });
+      toast('已拍照');
+      loadTeleopPhotos();
+      if (info?.url) {
+        await openTeleopPhotoSheet(info.url, info.name);
+      }
+    } catch (err) {
+      toast('拍照失败：' + err.message, 'err');
+    } finally {
+      snapBtn.disabled = false;
+    }
+  }
+
+  /* ---------- 历史 ---------- */
+  function dayKey(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+  function dayLabel(ts) {
+    const d = new Date(ts * 1000);
+    const now = new Date();
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = Math.round((t0 - d0) / 86400000);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '昨天';
+    if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+    return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  }
+  function syncHistoryFilter() {
+    $$('#historyFilter button').forEach((b) => {
+      b.classList.toggle('on', b.dataset.filter === state.historyFilter);
+    });
+  }
+
+  async function loadHistory() {
+    try {
+      state.jobs = await api('/api/jobs?limit=30');
+      renderHistory();
+      renderTodayStats();
+    } catch (err) {
+      if (state.route === 'history') {
+        $('#historyBody').innerHTML = emptyBlock('读取失败', err.message);
+      }
+    }
+  }
+
+  function renderHistory() {
+    syncHistoryFilter();
+    const box = $('#historyBody');
+    const filtered = state.jobs.filter((j) => (
+      state.historyFilter === 'all' || j.type === state.historyFilter
+    ));
+    if (!filtered.length) {
+      const copy = state.historyFilter === 'message'
+        ? ['没有消息记录', '在首页让它说句话，记录会出现在这里']
+        : state.historyFilter === 'timer'
+          ? ['还没有专注记录', '开始一次番茄钟，完成情况会记录在这里']
+          : ['还没有记录', `让${deviceName()}说句话，或开始一次专注`];
+      box.innerHTML = emptyBlock(copy[0], copy[1]);
+      return;
+    }
+    const groups = [];
+    let cur = null;
+    filtered.forEach((j) => {
+      const key = dayKey(j.created_at);
+      if (!cur || cur.key !== key) {
+        cur = { key, label: dayLabel(j.created_at), jobs: [] };
+        groups.push(cur);
+      }
+      cur.jobs.push(j);
+    });
+    box.innerHTML = groups.map((g) => `
+      <section class="day-group">
+        <h2 class="day-label">${esc(g.label)}</h2>
+        <div class="list-card">${g.jobs.map((j) => jobRow(j)).join('')}</div>
+      </section>`).join('');
+  }
+
+  function computeToday() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const done = state.jobs.filter((j) => j.type === 'timer' && j.status === 'done'
+      && new Date(j.created_at * 1000) >= today);
+    const mins = done.reduce((sum, j) => {
+      const plan = (j.payload?.duration_ms || 0) / 60000;
+      if (j.outcome === 'early' && j.finished_at) {
+        return sum + Math.round((j.finished_at - j.created_at) / 60);
+      }
+      return sum + Math.round(plan);
+    }, 0);
+    return { count: done.length, mins };
+  }
+
+  function renderTodayStats() {
+    const { count, mins } = computeToday();
+    const box = $('#todayStats');
+    if (box) {
+      box.innerHTML = `
+        <div class="stat-box"><div class="num">${count}</div><div class="lab">今天完成的专注</div></div>
+        <div class="stat-box"><div class="num">${mins}<small>分钟</small></div><div class="lab">累计专注时长</div></div>`;
+    }
+    const run = $('#runStats');
+    if (run) run.textContent = `今天 ${count} 次 · ${mins} 分钟`;
+  }
+
+  $('#historyFilter').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-filter]');
+    if (!b) return;
+    state.historyFilter = b.dataset.filter;
+    renderHistory();
+  });
+  $('#historyRefresh').addEventListener('click', () => {
+    loadHistory();
+    loadRecent();
+  });
+
+  /* ---------- 设置 ---------- */
+  function fillConnFields() {
+    if (document.activeElement !== $('#server')) $('#server').value = state.serverBase;
+    if (document.activeElement !== $('#token')) $('#token').value = state.token;
+  }
+  function setConnResult(text, kind = '') {
+    const el = $('#connResult');
+    el.textContent = text;
+    el.className = 'status-line' + (kind ? ' ' + kind : '');
+  }
+
+  async function loadSettings() {
+    fillConnFields();
+    renderSettingsDevice();
+    try {
+      const s = await api('/api/settings');
+      state.settings = s;
+      if (document.activeElement !== $('#histKeep')) {
+        $('#histKeep').value = s.values.history_keep;
+      }
+      $('#histKeep').min = s.spec.history_keep.min;
+      $('#histKeep').max = s.spec.history_keep.max;
+      const ro = $('#roCard');
+      ro.innerHTML = `
+        <div class="kv-row"><span class="k">主对话音色</span><span class="v">${esc(s.readonly?.xiaozhi_voice || '读不到配置')}</span></div>
+        <div class="kv-row"><span class="k">播报音色</span><span class="v">${esc(s.readonly?.behavior_voice || '—')}</span></div>`;
+    } catch (err) {
+      // 连接错误已经由横幅说明，这里只把只读区标成读不到
+      $('#roCard').innerHTML = `<div class="empty small"><b>读取失败</b><p>${esc(err.message)}</p></div>`;
+    }
+    loadStats();
+  }
+
+  async function loadStats() {
+    try {
+      const st = await api('/api/maintenance/stats');
+      state.stats = st;
+      $('#statsLine').textContent =
+        `${st.jobs} 条记录 · 音频 ${st.audio_files} 个 / ${fmtBytes(st.audio_bytes)} · 数据库 ${fmtBytes(st.db_bytes)}`;
+      $('#tileHistorySub').textContent = `${st.jobs} 条记录`;
+    } catch (err) {
+      $('#statsLine').textContent = '统计读不到';
+    }
+  }
+
+  $('#toggleToken').addEventListener('click', () => {
+    const input = $('#token');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    $('#toggleToken').innerHTML = `<svg class="icon"><use href="#i-${show ? 'eye-off' : 'eye'}"></use></svg>`;
+  });
+
+  $('#testConn').addEventListener('click', async () => {
+    const target = ($('#server').value.trim() || location.origin).replace(/\/+$/, '');
+    setConnResult('连接中…');
+    const started = performance.now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const r = await fetch(target + '/health', { cache: 'no-store', signal: ctrl.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      setConnResult(`通了 · ${Math.round(performance.now() - started)}ms · ${data.devices_online} 台在线`, 'ok');
+    } catch (err) {
+      setConnResult(`不通：${err.name === 'AbortError' ? '超时' : err.message}`, 'bad');
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
+  $('#saveConn').addEventListener('click', async () => {
+    const raw = $('#server').value.trim().replace(/\/+$/, '');
+    const tok = $('#token').value.trim();
+    if (!tok) {
+      setConnResult('App Token 不能为空', 'bad');
+      return;
+    }
+    if (raw) localStorage.setItem('chan_base', raw);
+    else localStorage.removeItem('chan_base');
+    localStorage.setItem('chan_token', tok);
+    state.serverBase = raw;
+    state.token = tok;
+    hideBanner();
+    setConnResult('已保存，正在重新连接…');
+    await refreshDevices();
+    await Promise.all([loadRecent(), loadHistory(), syncActive(), loadSettings()]);
+    setConnResult(`已保存 · 设备${state.deviceOnline ? '在线' : '离线'}`, 'ok');
+    toast('连接参数已保存');
+  });
+
+  $('#saveHist').addEventListener('click', async () => {
+    const v = parseInt($('#histKeep').value, 10);
+    if (!v || v < 20 || v > 5000) {
+      toast('保留条数要在 20–5000 之间', 'err');
+      return;
+    }
+    try {
+      const r = await api('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history_keep: v }),
+      });
+      toast(`已保存：保留最近 ${r.values.history_keep} 条`);
+      loadStats();
+    } catch (err) {
+      toast('保存失败：' + err.message, 'err');
+    }
+  });
+
+  function askCleanup(kind) {
+    const isHist = kind === 'history';
+    const jobs = state.stats?.jobs ?? '—';
+    const keep = state.stats?.history_keep ?? '—';
+    if (isHist && state.stats && state.stats.jobs <= state.stats.history_keep) {
+      openSheet({
+        title: '暂时不用清理',
+        body: `当前共 ${jobs} 条记录，没有超过保留上限 ${keep} 条。等记录攒多了再来。`,
+        actions: [{ label: '好', kind: 'primary' }],
+      });
+      return;
+    }
+    openConfirm({
+      title: isHist ? '清理历史记录？' : '清理音频缓存？',
+      body: isHist
+        ? `只删已结束、超出保留上限（当前 ${keep} 条）的旧记录，进行中的任务不受影响。现在共 ${jobs} 条。`
+        : '只删除 24 小时前生成、且已经没人使用的音频文件，最近合成的不会被动。',
+      confirm: '开始清理',
+      cancel: '先不清',
+      onConfirm: () => doCleanup(kind),
+    });
+  }
+
+  async function doCleanup(kind) {
+    try {
+      const r = await api('/api/maintenance/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [kind]: true }),
+      });
+      const st = await api('/api/maintenance/stats');
+      state.stats = st;
+      if (kind === 'history') {
+        toast(r.jobs_deleted > 0
+          ? `删了 ${r.jobs_deleted} 条，剩 ${st.jobs} 条`
+          : st.jobs <= st.history_keep
+            ? `没有可清理的：共 ${st.jobs} 条，未超过上限 ${st.history_keep}`
+            : '没有可清理的：剩下的都是进行中的记录');
+        loadHistory(); loadRecent();
+      } else {
+        toast(r.audio_deleted > 0
+          ? `删了 ${r.audio_deleted} 个音频`
+          : '没有可清理的音频（只清 24 小时前的）');
+      }
+      loadStats();
+    } catch (err) {
+      toast('清理失败：' + err.message, 'err');
+    }
+  }
+
+  $('#cleanupHist').addEventListener('click', () => askCleanup('history'));
+  $('#cleanupAudio').addEventListener('click', () => askCleanup('audio'));
+
+  $('#exportBtn').addEventListener('click', () => {
+    const data = { version: 2, base: state.serverBase, token: state.token };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chan-config.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  $('#importBtn').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (typeof data.base === 'string') {
+        if (data.base) localStorage.setItem('chan_base', data.base);
+        else localStorage.removeItem('chan_base');
+      }
+      if (typeof data.token === 'string' && data.token) {
+        localStorage.setItem('chan_token', data.token);
+      }
+      location.reload();
+    } catch (err) {
+      toast('配置文件读不出来：' + err.message, 'err');
+    }
+  });
+
+  /* ---------- 首页跳转 ---------- */
+  $('#homeSettings').addEventListener('click', () => go('settings'));
+  $('#tileSettings').addEventListener('click', () => go('settings'));
+  $('#tileHistory').addEventListener('click', () => {
+    state.historyFilter = 'all';
+    go('history');
+  });
+  $('#recentAll').addEventListener('click', () => {
+    state.historyFilter = 'all';
+    go('history');
+  });
+  $('#tileTimer').addEventListener('click', () => go('timer'));
+  // 番茄钟运行中在入口就拦下（用户 2026-11-12 反馈：不要进了遥控页才提示）
+  $('#tileTeleop').addEventListener('click', async () => {
+    try {
+      await syncActive();
+    } catch (err) {
+      /* 状态查不到就按原流程进页面，页面内还有兜底检查 */
+    }
+    if (state.active) {
+      toast('专注中，先结束计时再遥控');
+      return;
+    }
+    go('teleop');
+  });
+
+  /* ---------- 遥控页交互 ---------- */
+  setupTeleopStick();
+  $('#teleopCenter').addEventListener('click', teleopCenter);
+  $('#teleopScan').addEventListener('click', teleopScan);
+  $('#teleopSnap').addEventListener('click', teleopSnap);
+  $('#teleopGalleryAll').addEventListener('click', () => loadTeleopPhotos());
+  $('#teleopGalleryClear').addEventListener('click', clearTeleopPhotos);
+  $('#teleopPhotos').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.shot');
+    if (!btn) return;
+    try {
+      await openTeleopPhotoSheet(btn.dataset.url, btn.dataset.name);
+    } catch (err) {
+      toast('照片读取失败', 'err');
+    }
+  });
+  window.addEventListener('resize', () => {
+    if (state.route === 'teleop') renderTeleopKnob();
+  });
+  // 切后台 = 关摄像头（设备侧还有 30s 兜底）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkAppVersion();
+    if (document.hidden && state.route === 'teleop') {
+      teleopStop();
+    } else if (!document.hidden && state.route === 'teleop' && !teleopState.active) {
+      enterTeleopPage();
+    }
+  });
+
+  // 页面版本自检：服务端部署新版本后，切回前台会自动刷新（旧页面缓存教训，2026-11-12）
+  async function checkAppVersion() {
+    try {
+      const res = await fetch(apiBase() + '/api/app_version', { cache: 'no-store' });
+      if (!res.ok) return;
+      const { version } = await res.json();
+      if (!version) return;
+      const seen = localStorage.getItem('chan_app_ver');
+      if (seen && seen !== version) {
+        localStorage.setItem('chan_app_ver', version);
+        location.reload();
+        return;
+      }
+      localStorage.setItem('chan_app_ver', version);
+    } catch (err) {
+      /* 离线或旧服务端：忽略 */
+    }
+  }
+  $('#recentList').addEventListener('click', (e) => {
+    if (e.target.closest('.row')) {
+      state.historyFilter = 'all';
+      go('history');
+    }
+  });
+  $$('[data-go]').forEach((b) => {
+    b.addEventListener('click', () => go(b.dataset.go, { replace: true }));
+  });
+
+  $('#bannerFix').addEventListener('click', () => go('settings'));
+  $('#bannerClose').addEventListener('click', hideBanner);
+  window.addEventListener('offline', () => showBanner('手机断网了'));
+  window.addEventListener('online', () => {
+    hideBanner();
+    refreshDevices();
+  });
+
+  /* ---------- 启动 ---------- */
+  async function init() {
+    renderRoute(routeFromHash());
+    await refreshDevices();
+    await Promise.all([loadRecent(), loadHistory(), syncActive()]);
+    checkAppVersion();
+    setInterval(refreshDevices, 5000);
+    setInterval(() => { if (state.route === 'home') loadRecent(); }, 15000);
+    setInterval(() => { syncActive(); }, 8000);
+  }
+  init();
+})();
+</script>
+</body>
+</html>
