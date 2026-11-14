@@ -54,7 +54,9 @@ VAD:
     threshold: 0.5
     threshold_low: 0.3
     model_dir: models/snakers4_silero-vad
-    min_silence_duration_ms: 200
+    # 判停静默阈值。上游示例是 200ms，会把句中逗号级停顿当成说完
+    # （中文自然停顿 400–800ms）。500ms 兼顾长句完整与响应速度。
+    min_silence_duration_ms: 500
 
 ASR:
   FunASR:
