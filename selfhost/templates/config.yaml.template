@@ -23,6 +23,15 @@ debug_opus_dump: false
 close_connection_no_voice_time: 60
 disable_device_mcp_tools: true
 
+# 语音会话参数：必须与设备 hello 声明一致（设备硬编码 16000）。
+# 缺这段会合并镜像默认 24000 → 服务端按 24k 合成却告诉设备 16k，声音断续。
+xiaozhi:
+  audio_params:
+    sample_rate: 16000
+    format: opus
+    channels: 1
+    frame_duration: 60
+
 # 人设
 prompt: |
 ${PERSONA_INDENTED}
@@ -47,6 +56,28 @@ selected_module:
   TTS: EdgeTTS
   Memory: ${MEMORY}
   Intent: function_call
+
+# 意图识别：function_call 下必须显式列出要加载的工具。
+# 缺这段会合并镜像默认值（web_search=metaso 占位 key、play_music、热榜新闻），
+# 我们的 deepsearch 不会被注册——2026-11-15 就是这样丢的联网搜索。
+Intent:
+  nointent:
+    type: nointent
+  intent_llm:
+    type: intent_llm
+    llm: ChatGLMLLM
+    functions:
+      - web_search
+      - get_weather
+      - get_news_from_newsnow
+      - play_music
+  function_call:
+    type: function_call
+    functions:
+      # 只保留这两个；get_news_from_newsnow 会抢「新闻」类查询但只回热榜，
+      # 质量不如 deepsearch（2026-11-09 定）
+      - deepsearch
+      - get_weather
 
 VAD:
   SileroVAD:

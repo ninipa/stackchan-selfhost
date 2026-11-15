@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.2 — 2026-11-15
+
+### Server（`selfhost/`）
+
+- 修复配置页保存后搜索工具回退：模板缺 `Intent` 段时，服务端会合并镜像默认值
+  （`web_search`=metaso 占位 key、`play_music`、热榜新闻），自带的 `deepsearch`
+  不会注册，新闻/赛事类问题只能回「查不到」。模板补回 `Intent`，
+  `function_call` 只启用 `deepsearch` + `get_weather`。
+- 修复采样率回退：模板缺 `xiaozhi.audio_params.sample_rate` 时会合并镜像默认
+  24000，与设备 hello 声明的 16000 不一致，重现声音断续。模板固定 16000。
+- 两项同源：最小覆盖配置 + 配置页整份重写。已核对旧全量配置里所有定制项，
+  其余（模型、音色、VAD、记忆、close_connection 等）均保留。
+
 ## v0.1.1 — 2026-11-14
 
 ### Server（`selfhost/`）
