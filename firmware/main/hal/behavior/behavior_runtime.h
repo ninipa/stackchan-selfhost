@@ -19,3 +19,6 @@ void behavior_runtime_enqueue_panel();
 
 // 用户唤醒/进入聆听时调用：让行为表演立刻让位给语音
 void behavior_runtime_on_voice_activity();
+
+/** 点屏幕：当前是 stop_on_touch 的备忘录脚本时消费这次点击并请求停止，返回 true。 */
+bool behavior_runtime_consume_memo_tap();

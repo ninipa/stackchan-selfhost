@@ -82,6 +82,13 @@ void Hal::refreshRgb()
     _io_expander->refreshLeds();
 }
 
+void Hal::setRgbColorPair(uint8_t r, uint8_t g, uint8_t b)
+{
+    // 12 颗灯分两条：0-5 左、6-11 右；0 和 11 是左右对称的同一端。
+    setRgbColor(0, r, g, b);
+    setRgbColor(11, r, g, b);
+}
+
 void Hal::showRgbColor(uint8_t r, uint8_t g, uint8_t b)
 {
     for (int i = 0; i < 12; i++) {

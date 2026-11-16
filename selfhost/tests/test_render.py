@@ -63,6 +63,22 @@ class RenderTests(unittest.TestCase):
         self.assertIn("TZ=Asia/Shanghai", files[".env"])
         self.assertNotIn("XIAOZHI_IMAGE=", files[".env"])
         self.assertTrue(files["data/agent-base-prompt.txt"].startswith("You are a playful"))
+        self.assertIn("start_pomodoro", files["data/agent-base-prompt.txt"])
+        self.assertIn("stop_pomodoro", files["data/agent-base-prompt.txt"])
+        self.assertIn("- start_pomodoro", cfg)
+        self.assertIn("- stop_pomodoro", cfg)
+        self.assertIn('base_url: "http://host.docker.internal:8100"', cfg)
+        self.assertIn('app_token: "0123456789abcdef', cfg)
+
+    def test_behavior_internal_url_override(self):
+        files = render.build(
+            env(BEHAVIOR_INTERNAL_URL="http://192.168.1.20:8100"),
+            allow_insecure=False,
+        )
+        self.assertIn(
+            'base_url: "http://192.168.1.20:8100"',
+            files["data/.config.yaml"],
+        )
 
     def test_image_override_in_compose_env(self):
         files = render.build(env(XIAOZHI_IMAGE="ghcr.io/x/y@sha256:abc"), allow_insecure=False)

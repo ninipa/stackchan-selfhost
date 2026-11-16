@@ -622,8 +622,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         // 进入聆听 = 用户要说话，行为表演让位给语音
         behavior_runtime_on_voice_activity();
 
-        // 聆听：单颗 LED 0（用户实验：光会从壳体扩散，单颗即可）
-        GetHAL().setRgbColor(0, 0, 50, 0);
+        // 聆听：左右各一颗（0/11，2026-11-16 灯序诊断确认对称）
+        GetHAL().setRgbColorPair(0, 50, 0);
         GetHAL().refreshRgb();
 
     } else if (strcmp(status, Lang::Strings::STANDBY) == 0) {
@@ -638,8 +638,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
         is_idle = true;
 
-        // 待机：单颗 LED 0 熄灭（遥控紫灯会在语音结束后由 teleop 恢复）
-        GetHAL().setRgbColor(0, 0, 0, 0);
+        // 待机：左右各一颗熄灭（遥控紫灯会在语音结束后由 teleop 恢复）
+        GetHAL().setRgbColorPair(0, 0, 0);
         GetHAL().refreshRgb();
 
     } else if (strcmp(status, Lang::Strings::SPEAKING) == 0) {
@@ -647,8 +647,8 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
             speaking_modifier_id_ = stackchan.addModifier(std::make_unique<SpeakingModifier>(0, 180, false));
         }
 
-        // 说话：单颗 LED 0 蓝色
-        GetHAL().setRgbColor(0, 0, 0, 50);
+        // 说话：左右各一颗蓝色
+        GetHAL().setRgbColorPair(0, 0, 50);
         GetHAL().refreshRgb();
     } else {
         avatar.setSpeech(status);

@@ -60,6 +60,8 @@ struct Step {
 
 struct Job {
     std::string id;
+    std::string kind;
+    bool stop_on_touch = false;
     std::vector<Step> steps;
     size_t index = 0;
     int say_phase = 0;  // 0=start, 1=playing, 2=gap
@@ -78,6 +80,8 @@ Job s_pending;
 bool s_active = false;
 bool s_has_pending = false;
 std::atomic<bool> s_voice_activity{false};
+// 供 LVGL 触摸回调读取：当前跑的是不是"点屏幕停止"的备忘录脚本
+std::atomic<bool> s_memo_active{false};
 
 const char* jstr(const cJSON* obj, const char* key)
 {
@@ -104,6 +108,11 @@ bool parse_script(const std::string& json, Job& job)
         return false;
     }
     job.id = id->valuestring;
+
+    const char* kind = jstr(root, "kind");
+    job.kind = kind ? kind : "";
+    const cJSON* stop_on_touch = cJSON_GetObjectItem(root, "stop_on_touch");
+    job.stop_on_touch = cJSON_IsTrue(stop_on_touch);
 
     const cJSON* steps = cJSON_GetObjectItem(root, "steps");
     if (!cJSON_IsArray(steps)) {
@@ -209,9 +218,24 @@ void cancel_job(const char* reason)
     send_event("job_error", s_job.id, reason);
     if (display() != nullptr) {
         display()->ClearChatMessages();
+        display()->SetEmotion("neutral");
     }
+    // 脚本末尾的 led off / neutral / 回正在 cancel 时不会执行，这里补上。
+    // 正在聆听/说话时保留状态灯，避免把语音状态指示擦掉。
+    auto device_state = Application::GetInstance().GetDeviceState();
+    if (device_state == kDeviceStateListening) {
+        GetHAL().setRgbColorPair(0, 50, 0);
+    } else if (device_state == kDeviceStateSpeaking) {
+        GetHAL().setRgbColorPair(0, 0, 50);
+    } else {
+        GetHAL().setRgbColorPair(0, 0, 0);
+    }
+    GetHAL().refreshRgb();
+    GetStackChan().motion().setModifyLock(false);
+    GetStackChan().motion().moveWithSpeed(0, 200, 500);
     free_audio(s_job);
     behavior_audio_clear();
+    s_memo_active.store(false);
     s_job = Job();
     s_active = false;
 }
@@ -234,6 +258,7 @@ void advance()
             display()->ClearChatMessages();
         }
         behavior_audio_clear();
+        s_memo_active.store(false);
         s_job = Job();
         s_active = false;
     }
@@ -244,6 +269,7 @@ void start_job(Job&& job)
     s_job = std::move(job);
     s_active = true;
     s_job.index = 0;
+    s_memo_active.store(s_job.kind == "memo" && s_job.stop_on_touch);
     send_event("job_started", s_job.id);
     ESP_LOGI(TAG, "job %s started (%u steps)", s_job.id.c_str(),
              static_cast<unsigned>(s_job.steps.size()));
@@ -389,8 +415,8 @@ void update_step()
             break;
 
         case Op::Led:
-            GetHAL().setRgbColor(0, static_cast<uint8_t>(step.r), static_cast<uint8_t>(step.g),
-                                 static_cast<uint8_t>(step.b));
+            GetHAL().setRgbColorPair(static_cast<uint8_t>(step.r), static_cast<uint8_t>(step.g),
+                                     static_cast<uint8_t>(step.b));
             GetHAL().refreshRgb();
             advance();
             break;
@@ -483,6 +509,21 @@ void behavior_runtime_enqueue_cancel(const char* job_id)
     enqueue("C", job_id ? job_id : "");
 }
 
+static void behavior_runtime_enqueue_memo_tap()
+{
+    enqueue("M", "");
+}
+
+bool behavior_runtime_consume_memo_tap()
+{
+    if (!s_memo_active.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    // 不在 LVGL 回调里直接改 job；投递给主循环处理。
+    behavior_runtime_enqueue_memo_tap();
+    return true;
+}
+
 void behavior_runtime_on_voice_activity()
 {
     s_voice_activity = true;
@@ -512,6 +553,11 @@ void behavior_runtime_update()
             s_has_pending = false;
             s_pending = Job();
             ESP_LOGI(TAG, "cancel requested");
+        } else if (message[0] == 'M') {
+            // 点屏幕停止：只对带 stop_on_touch 的备忘录脚本生效
+            if (s_active && s_job.stop_on_touch && s_job.kind == "memo") {
+                cancel_job("touch_stop");
+            }
         } else if (message[0] == 'T') {
             // 番茄钟是后台状态，不占执行器：直接交给 pomodoro 维护
             pomodoro_apply(message + 1);

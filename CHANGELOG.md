@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.1.3 — 2026-11-16
+
+### Firmware（StackChan K151 / ESP-IDF 6.1）
+
+- 备忘录点停：播报中点屏幕直接停止、回 idle/灭灯，不进入聆听；消息/番茄钟/遥控语义不变。
+- 取消/点停恢复：按语音状态恢复 LED、neutral、回 20°，清理音频与气泡。
+- LED 对称：状态灯、遥控隐私灯、番茄钟、behavior LED 统一左右各一颗（0/11），
+  修复“只亮左侧”；MCP 整条 `set_led_color` 和动画灯效不变。
+
+### Server（`selfhost/`）
+
+- 备忘录 App：单次/循环（每天/每周/每月/工作日）、结束日期、暂停/恢复/删除、
+  历史筛选；全局提醒重复次数 1–20（默认 5）；到点暖黄 + 点头 + 5 遍播报，
+  点屏幕停止。
+- 语音番茄钟：`start_pomodoro`；缺时长追问，模型猜的时长会被“用户原话有时长线索”守卫拦掉。
+- 语音关闭番茄钟：`stop_pomodoro`；先查 active，到点 `finish`、计时中 `cancel`；
+  `finish` 支持 `announce=false`，避免 behavior 和 xiaozhi 两个 TTS 叠音。
+- 公开 README 增加备忘录、语音番茄钟和 LED 对称说明。
+
+### Known limitations
+
+- 备忘录语音创建（`create_memo`）仍在规划，未上线。
+- 语音只支持番茄钟 start/stop；改时长、查剩余时间、多计时器未做。
+
 ## v0.1.2 — 2026-11-15
 
 ### Server（`selfhost/`）

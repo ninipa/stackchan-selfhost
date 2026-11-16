@@ -30,6 +30,8 @@
     --red-soft:#F5DCD8;
     --dark:#191712;
     --eye:#9CEFD9;
+    --plum:#8A5A83;
+    --plum-soft:#F2E4EF;
     --shadow-card:0 18px 44px -34px rgba(54,40,22,.5);
     --ease:cubic-bezier(.22,1,.36,1);
   }
@@ -192,6 +194,8 @@
   .tile-history .tile-icon{background:rgba(47,140,114,.1);color:var(--mint)}
   .tile-settings{background:linear-gradient(135deg,#FBF1DF 0%,#F4E6CB 100%);border-color:#EEDFC2}
   .tile-settings .tile-icon{background:rgba(185,124,37,.11);color:var(--amber)}
+  .tile-memo{background:linear-gradient(135deg,#F7EAF3 0%,#EEDCEC 100%);border-color:#E4CFE1}
+  .tile-memo .tile-icon{background:rgba(138,90,131,.1);color:var(--plum)}
   .tile-timer.running{background:linear-gradient(135deg,#211E17 0%,#312A20 100%);border-color:#312A20;color:#F8F3E9}
   .tile-timer.running .tile-body small{color:rgba(248,243,233,.58)}
   .tile-timer.running .tile-icon{background:rgba(156,239,217,.1);color:var(--eye)}
@@ -217,6 +221,7 @@
   }
   .row-icon.msg{background:var(--accent-soft);color:var(--accent)}
   .row-icon.timer{background:var(--mint-soft);color:var(--mint)}
+  .row-icon.memo{background:var(--plum-soft);color:var(--plum)}
   .row-main{flex:1;min-width:0}
   .row-title{display:block;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .row-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -226,6 +231,83 @@
   .pill.bad{background:var(--red-soft);color:var(--red)}
   .pill.live{background:var(--accent-soft);color:var(--accent)}
   .pill.mute{background:rgba(33,29,23,.055);color:var(--muted)}
+
+  /* ========== 备忘录 ========== */
+  .memo-list{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow-card)}
+  .memo-row{display:flex;align-items:flex-start;gap:11px;padding:13px 14px;border-bottom:1px solid var(--line)}
+  .memo-row:last-child{border-bottom:0}
+  .memo-row:active{background:var(--surface-2)}
+  .memo-check{
+    width:27px;height:27px;border-radius:50%;border:1.5px solid var(--line-2);background:transparent;
+    display:grid;place-items:center;color:var(--dim);opacity:.62;flex:0 0 auto;margin-top:1px;
+    transition:background .15s,border-color .15s,color .15s,opacity .15s,transform .12s;
+  }
+  .memo-check:active{transform:scale(.9)}
+  .memo-check svg{width:14px;height:14px;stroke-width:2.6}
+  .memo-main{flex:1;min-width:0;border:0;background:none;padding:0;text-align:left}
+  .memo-title{display:block;font-size:14px;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .memo-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .memo-detail{display:block;font-size:11px;color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .memo-tags{display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap}
+  .memo-tag{font-size:9.5px;font-weight:600;padding:3px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+  .memo-tag.repeat{background:var(--plum-soft);color:var(--plum)}
+  .memo-tag.warn{background:var(--amber-soft);color:var(--amber)}
+  .memo-tag.done{background:var(--mint-soft);color:var(--mint)}
+  .memo-row.stopped .memo-title{color:var(--muted)}
+  .memo-row.stopped .memo-main{cursor:pointer}
+  .memo-actions{display:flex;flex-direction:column;align-items:center;gap:9px;flex:0 0 auto;margin-top:1px}
+  .memo-delete{
+    width:30px;height:30px;border:0;border-radius:9px;background:transparent;color:var(--dim);
+    display:grid;place-items:center;transition:background .15s,color .15s,transform .12s;
+  }
+  .memo-delete:active{background:var(--red-soft);color:var(--red);transform:scale(.94)}
+  .memo-delete svg{width:16px;height:16px}
+  .memo-group{margin-bottom:18px}
+  .memo-empty{padding:22px 16px}
+  .memo-repeat-card{padding:14px 15px;margin-bottom:16px}
+  .memo-repeat-main{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .memo-repeat-text b{display:block;font-size:14px;font-weight:600}
+  .memo-repeat-text small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+  .switch{position:relative;display:inline-flex;width:42px;height:26px;flex:0 0 auto;margin-top:1px}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch span{position:absolute;inset:0;border-radius:999px;background:rgba(33,29,23,.13);transition:background .2s}
+  .switch span::after{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(33,29,23,.2);transition:transform .2s}
+  .switch input:checked + span{background:var(--mint)}
+  .switch input:checked + span::after{transform:translateX(16px)}
+  .switch input:disabled + span{opacity:.45}
+
+  .memo-form{display:flex;flex-direction:column;gap:13px;padding-bottom:4px}
+  .memo-field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .memo-field input[type=text],.memo-field textarea,.memo-field input[type=datetime-local],.memo-field input[type=date],.memo-field input[type=time]{
+    display:block;width:100%;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);
+    padding:12px 13px;font-size:16px;outline:none;transition:border-color .15s,box-shadow .15s;
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  .memo-when-summary{font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink);padding:2px 2px 8px}
+  .memo-when-controls{display:flex;gap:8px;align-items:center}
+  .memo-when-controls input[type=time],.memo-when-controls select{
+    flex:1;min-width:0;width:auto;padding:10px 12px;font-size:16px;border:1px solid var(--line);
+    border-radius:13px;background:var(--surface-2);color:var(--ink);outline:none;
+  }
+  .memo-when-controls select{-webkit-appearance:auto;appearance:auto}
+  .memo-field textarea{min-height:58px;resize:vertical;line-height:1.45}
+  .memo-field input:focus,.memo-field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .memo-field input::placeholder,.memo-field textarea::placeholder{color:#B4A996}
+  .memo-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .chip{
+    border:1px solid var(--line);border-radius:999px;background:var(--surface-2);color:var(--muted);
+    padding:7px 11px;font-size:11.5px;font-weight:500;
+    transition:background .15s,color .15s,border-color .15s,transform .12s;
+  }
+  .chip:active{transform:scale(.96)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+  .memo-end-row{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .memo-end-row input[type=date]{flex:1;min-width:0;margin-top:0}
+  .memo-field .memo-end-toggle{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);white-space:nowrap;margin:0}
+  .memo-end-toggle input{width:16px;height:16px;accent-color:var(--accent)}
+  .memo-form .primary{margin-top:2px;padding:14px;border-radius:14px;font-size:14.5px;box-shadow:none}
+  .memo-form .text-btn.danger{margin-top:-2px}
+
   .home-foot{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--dim);padding:2px 0 calc(26px + env(safe-area-inset-bottom))}
 
   /* ========== 子页头 ========== */
@@ -452,6 +534,7 @@
   .sheet-backdrop.on{opacity:1}
   .sheet{
     width:100%;max-width:560px;background:var(--surface);
+    max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;
     border-radius:28px 28px 0 0;padding:8px 20px calc(18px + env(safe-area-inset-bottom));
     transform:translateY(22px);transition:transform .28s var(--ease);
     box-shadow:0 -24px 70px -24px rgba(30,24,14,.4);
@@ -600,6 +683,9 @@
   <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.2"/><path d="M12 9.8V13l2.2 1.4M9.5 3.5h5M12 3.5v2.3"/></symbol>
   <symbol id="i-history" viewBox="0 0 24 24"><path d="M4.7 9.5A7.8 7.8 0 1 1 4.5 14"/><path d="M4.4 4.8v4.8h4.8M12 8.6V12l2.6 1.6"/></symbol>
   <symbol id="i-message" viewBox="0 0 24 24"><path d="M20 11.5a7.2 7.2 0 0 1-7.2 7.2H8.4L4 21l.9-4A7.2 7.2 0 1 1 20 11.5Z"/><path d="M8.6 11.6h.01M12 11.6h.01M15.4 11.6h.01"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9.5a6 6 0 1 0-12 0c0 4.7-1.8 5.8-1.8 5.8h15.6S18 14.2 18 9.5Z"/><path d="M9.8 19a2.3 2.3 0 0 0 4.4 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.3 4.3L19 7"/></symbol>
+  <symbol id="i-skip" viewBox="0 0 24 24"><path d="m6 6 6 6-6 6M13 6l6 6-6 6"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4.5V10h-5.5"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12S6.2 6.5 12 6.5 21.2 12 21.2 12 17.8 17.5 12 17.5 2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.6"/></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m4 4 16 16M9.9 6.9A9.7 9.7 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a16 16 0 0 1-3.1 3.6M6.2 8.6A16 16 0 0 0 2.8 12S6.2 17.5 12 17.5a9.8 9.8 0 0 0 4-.8"/></symbol>
@@ -697,6 +783,11 @@
             <b id="tileTimerTitle">番茄钟</b>
             <small id="tileTimerSub">开始一次 25 分钟的专注</small>
           </span>
+          <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
+        </button>
+        <button type="button" class="tile tile-memo" id="tileMemo">
+          <span class="tile-icon"><svg class="icon"><use href="#i-bell"></use></svg></span>
+          <span class="tile-body"><b>备忘录</b><small id="tileMemoSub">单次 / 循环提醒</small></span>
           <span class="chev"><svg class="icon sm"><use href="#i-chevron-right"></use></svg></span>
         </button>
         <button type="button" class="tile tile-history" id="tileHistory">
@@ -811,6 +902,43 @@
     </main>
   </section>
 
+  <!-- ==================== 备忘录 ==================== -->
+  <section class="page" id="page-memo">
+    <header class="page-head">
+      <button class="icon-btn" data-go="home" aria-label="返回">
+        <svg class="icon"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h1>备忘录</h1>
+      <button class="icon-btn" id="memoAdd" aria-label="新建备忘录">
+        <svg class="icon"><use href="#i-plus"></use></svg>
+      </button>
+    </header>
+
+    <main class="page-main">
+      <section class="card memo-repeat-card">
+        <div class="memo-repeat-main">
+          <div class="memo-repeat-text">
+            <b>提醒重复次数</b>
+            <small>全局，所有备忘录共用</small>
+          </div>
+          <div class="stepper" aria-label="提醒重复次数">
+            <button type="button" id="memoRepeatMinus" aria-label="减少重复次数">
+              <svg class="icon sm"><use href="#i-minus"></use></svg>
+            </button>
+            <span class="stepper-val"><b id="memoRepeatVal">5</b></span>
+            <button type="button" id="memoRepeatPlus" aria-label="增加重复次数">
+              <svg class="icon sm"><use href="#i-plus"></use></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div id="memoBody">
+        <div class="empty"><div class="empty-face"><i></i><i></i></div><b>读取中</b></div>
+      </div>
+    </main>
+  </section>
+
   <!-- ==================== 历史 ==================== -->
   <section class="page" id="page-history">
     <header class="page-head">
@@ -828,6 +956,7 @@
         <button type="button" data-filter="all" class="on">全部</button>
         <button type="button" data-filter="message">消息</button>
         <button type="button" data-filter="timer">番茄钟</button>
+        <button type="button" data-filter="memo">备忘录</button>
       </div>
       <div id="historyBody">
         <div class="empty"><div class="empty-face"><i></i><i></i></div><b>读取中</b></div>
@@ -1064,11 +1193,12 @@
   /* ---------- 路由 ---------- */
   // 首页是唯一入口，其余页面从首页的卡片 / 按钮进入。
   // 以后加新功能只需要加一块 tile 和一个 route，不会把底部导航挤爆。
-  const ROUTES = new Set(['home', 'teleop', 'timer', 'history', 'settings']);
+  const ROUTES = new Set(['home', 'teleop', 'timer', 'memo', 'history', 'settings']);
   const LEGACY_ROUTE = {
     msg: 'home', home: 'home',
     teleop: 'teleop', cam: 'teleop', camera: 'teleop',
     timer: 'timer',
+    memo: 'memo', reminder: 'memo', reminders: 'memo',
     hist: 'history', history: 'history',
     set: 'settings', settings: 'settings',
   };
@@ -1108,6 +1238,11 @@
       renderTimerPage();
       syncActive();
       loadHistory();
+    } else if (route === 'memo') {
+      renderDevice();
+      renderMemoPage();
+      loadMemos();
+      loadMemoSettings();
     } else if (route === 'history') {
       syncHistoryFilter();
       renderHistory();
@@ -1161,6 +1296,9 @@
     timer: null,
     active: null,
     ticker: null,
+    memos: [],
+    memoRepeat: 5,
+    memoDraftRepeat: 'none',
     repeat: 1,
     selectedMin: 25,
     customMin: 30,
@@ -1181,10 +1319,12 @@
     running: '进行中',
     done: '完成',
     error: '失败',
+    stopped: '已停止',
     canceled: '已撤销',
     pending_resend: '等待重连',
     overtime: '超时中',
     expired: '未处理',
+    missed: '已错过',
   };
 
   /* ---------- 连接 / 错误 ---------- */
@@ -1319,10 +1459,18 @@
   async function refreshDevices() {
     try {
       const devices = await api('/api/devices');
+      const prevId = state.device?.id;
       state.devices = devices;
       state.device = pickDevice(devices);
       state.devicesLoaded = true;
       renderDevice();
+      if (state.device?.id !== prevId) {
+        if (state.route === 'memo') {
+          loadMemos();
+        } else if (state.route === 'home') {
+          loadRecent();
+        }
+      }
       // 直接深链进 #teleop / 设备刚上线时，自动补一次会话启动
       if (state.route === 'teleop' && !teleopState.active) enterTeleopPage();
       return state.device;
@@ -1354,6 +1502,7 @@
     setComposerEnabled(online);
     renderSettingsDevice();
     renderTimerStartState();
+    renderMemoTile();
     renderHeroStatus();
   }
 
@@ -1390,6 +1539,7 @@
   /* ---------- 任务展示 ---------- */
   function jobTitle(j) {
     if (j.type === 'timer') return j.payload?.task || j.payload?.label || '专注';
+    if (j.type === 'memo') return j.payload?.title || '备忘录';
     return j.payload?.text || '消息';
   }
   function jobSub(j, relative = false) {
@@ -1397,6 +1547,11 @@
     if (j.type === 'timer') {
       const plan = Math.round((j.payload?.duration_ms || 0) / 60000);
       return `${plan} 分钟 · ${when}`;
+    }
+    if (j.type === 'memo') {
+      const at = j.payload?.due_at ? memoTimeLabel(j.payload.due_at) : when;
+      const rule = j.payload?.repeat_label ? `${j.payload.repeat_label} · ` : '';
+      return `${rule}${at}`;
     }
     const repeat = j.payload?.repeat || 1;
     return `${repeat > 1 ? `重复 ${repeat} 遍 · ` : ''}${when}`;
@@ -1420,9 +1575,11 @@
       case 'done': return 'ok';
       case 'error': return 'bad';
       case 'canceled':
+      case 'stopped':
       case 'expired': return 'mute';
       case 'overtime':
       case 'pending_resend': return 'warn';
+      case 'missed': return 'warn';
       case 'running':
       case 'sent':
       case 'pending': return 'live';
@@ -1431,9 +1588,12 @@
   }
   function jobRow(j, relative = false) {
     const isTimer = j.type === 'timer';
+    const isMemo = j.type === 'memo';
     const label = isTimer ? timerOutcome(j) : (STATUS_TEXT[j.status] || j.status);
+    const iconName = isTimer ? 'timer' : isMemo ? 'bell' : 'message';
+    const iconClass = isTimer ? 'timer' : isMemo ? 'memo' : 'msg';
     return `<button type="button" class="row" data-job="${esc(j.id)}">
-      <span class="row-icon ${isTimer ? 'timer' : 'msg'}">${icon(isTimer ? 'timer' : 'message')}</span>
+      <span class="row-icon ${iconClass}">${icon(iconName)}</span>
       <span class="row-main">
         <span class="row-title">${esc(jobTitle(j))}</span>
         <span class="row-sub">${esc(jobSub(j, relative))}</span>
@@ -1450,12 +1610,17 @@
   /* ---------- 首页：最近 / 工具 ---------- */
   async function loadRecent() {
     try {
-      const [jobs, stats] = await Promise.all([
+      const memosReq = state.device
+        ? api('/api/memos?device_id=' + encodeURIComponent(state.device.id)).catch(() => [])
+        : Promise.resolve([]);
+      const [jobs, stats, memos] = await Promise.all([
         api('/api/jobs?limit=3'),
         api('/api/maintenance/stats'),
+        memosReq,
       ]);
       state.recent = jobs;
       state.stats = stats;
+      state.memos = memos;
       renderRecent();
       renderTiles();
     } catch (err) {
@@ -1475,6 +1640,7 @@
   function renderTiles() {
     $('#tileHistorySub').textContent = state.stats ? `${state.stats.jobs} 条记录` : '查看全部';
     renderTimerTile();
+    renderMemoTile();
   }
 
   /* ---------- 发消息 ---------- */
@@ -2479,6 +2645,546 @@
     }
   }
 
+  /* ---------- 备忘录 ---------- */
+  function localInputValue(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function localDateValue(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function defaultMemoWhen() {
+    const d = new Date(Date.now() + 3600 * 1000);
+    d.setSeconds(0, 0);
+    const m = Math.ceil(d.getMinutes() / 5) * 5;
+    if (m >= 60) {
+      d.setHours(d.getHours() + 1);
+      d.setMinutes(0);
+    } else {
+      d.setMinutes(m);
+    }
+    return localInputValue(d.getTime() / 1000);
+  }
+  function memoTimeLabel(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts * 1000);
+    const now = new Date();
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diff = Math.round((d0 - t0) / 86400000);
+    const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if (diff === 0) return `今天 ${hm}`;
+    if (diff === 1) return `明天 ${hm}`;
+    if (diff === 2) return `后天 ${hm}`;
+    if (diff === -1) return `昨天 ${hm}`;
+    if (d.getFullYear() === now.getFullYear()) {
+      return `${d.getMonth() + 1} 月 ${d.getDate()} 日 ${hm}`;
+    }
+    return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日 ${hm}`;
+  }
+  function memoDayLabel(ts) {
+    const d = new Date(ts * 1000);
+    const now = new Date();
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diff = Math.round((d0 - t0) / 86400000);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '明天';
+    if (diff === 2) return '后天';
+    if (diff === -1) return '昨天';
+    if (d.getFullYear() === now.getFullYear()) {
+      return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+    }
+    return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  }
+  function memoSub(memo) {
+    if (!memo.enabled) {
+      return memo.last_fired_at
+        ? `上次 ${memoTimeLabel(memo.last_fired_at)}`
+        : `原定 ${memoTimeLabel(memo.due_at)}`;
+    }
+    if (memo.repeat !== 'none') return `下次 ${memoTimeLabel(memo.due_at)}`;
+    return memoTimeLabel(memo.due_at);
+  }
+  function memoStatusTag(memo) {
+    if (memo.last_status === 'missed') return '<span class="memo-tag warn">上次错过</span>';
+    if (memo.last_status === 'error') return '<span class="memo-tag warn">上次失败</span>';
+    if (memo.last_status === 'stopped') return '<span class="memo-tag">上次停止</span>';
+    if (memo.last_status === 'sent') return '<span class="memo-tag done">已提醒</span>';
+    if (memo.due_at * 1000 <= Date.now()) {
+      return `<span class="memo-tag warn">${state.deviceOnline ? '到时间了' : '等待设备'}</span>`;
+    }
+    return '';
+  }
+  function memoRow(memo) {
+    const stopped = !memo.enabled;
+    const showCheck = !stopped && memo.repeat === 'none';
+    const statusTag = stopped
+      ? '<span class="memo-tag">已停止</span>'
+      : memoStatusTag(memo);
+    return `<div class="memo-row${stopped ? ' stopped' : ''}" data-memo="${esc(memo.id)}">
+      ${showCheck ? `<button type="button" class="memo-check" data-action="complete" aria-label="完成" title="完成">${icon('check')}</button>` : ''}
+      <button type="button" class="memo-main" data-action="edit">
+        <span class="memo-title">${esc(memo.title)}</span>
+        <span class="memo-sub">${esc(memoSub(memo))}</span>
+        ${memo.detail ? `<span class="memo-detail">${esc(memo.detail)}</span>` : ''}
+        <span class="memo-tags">
+          <span class="memo-tag repeat">${esc(memo.repeat_label || '单次')}</span>
+          ${statusTag}
+        </span>
+      </button>
+      <div class="memo-actions">
+        <label class="switch" aria-label="${memo.enabled ? '暂停' : '启用'}">
+          <input type="checkbox" data-toggle="1" ${memo.enabled ? 'checked' : ''}>
+          <span></span>
+        </label>
+        <button type="button" class="memo-delete" data-action="delete" aria-label="删除" title="删除">${icon('trash')}</button>
+      </div>
+    </div>`;
+  }
+  function renderMemoPage() {
+    const box = $('#memoBody');
+    if (!box) return;
+    if (!state.device) {
+      box.innerHTML = emptyBlock('还没有设备', '设备连上后才能设置备忘录');
+      return;
+    }
+    const active = state.memos
+      .filter((memo) => memo.enabled)
+      .sort((a, b) => a.due_at - b.due_at);
+    const stopped = state.memos
+      .filter((memo) => !memo.enabled)
+      .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
+    if (!active.length && !stopped.length) {
+      box.innerHTML = emptyBlock('还没有备忘录', '点右上角 + 添加一条，到点让包子提醒你');
+      return;
+    }
+    const groups = [];
+    let cur = null;
+    active.forEach((memo) => {
+      const key = dayKey(memo.due_at);
+      if (!cur || cur.key !== key) {
+        cur = { key, label: memoDayLabel(memo.due_at), items: [] };
+        groups.push(cur);
+      }
+      cur.items.push(memo);
+    });
+    let html = groups.map((group) => `
+      <section class="memo-group">
+        <h2 class="day-label">${esc(group.label)}</h2>
+        <div class="memo-list">${group.items.map(memoRow).join('')}</div>
+      </section>`).join('');
+    if (stopped.length) {
+      html += `<section class="memo-group">
+        <h2 class="day-label">已停止</h2>
+        <div class="memo-list">${stopped.map(memoRow).join('')}</div>
+      </section>`;
+    }
+    box.innerHTML = html;
+  }
+  function renderMemoTile() {
+    const el = $('#tileMemoSub');
+    if (!el) return;
+    if (!state.device) {
+      el.textContent = '还没有设备';
+      return;
+    }
+    const active = state.memos.filter((memo) => memo.enabled);
+    if (!active.length) {
+      el.textContent = '单次 / 循环提醒';
+      return;
+    }
+    const next = active.slice().sort((a, b) => a.due_at - b.due_at)[0];
+    el.textContent = `${active.length} 条待提醒 · 下次 ${memoTimeLabel(next.due_at)}`;
+  }
+  async function loadMemoSettings() {
+    try {
+      const data = await api('/api/settings');
+      state.memoRepeat = Number(data.values?.memo_repeat ?? 5) || 5;
+      const el = $('#memoRepeatVal');
+      if (el) el.textContent = state.memoRepeat;
+    } catch (err) {
+      /* 保持默认 5；不阻塞列表 */
+    }
+  }
+  async function setMemoRepeat(value) {
+    const n = Math.max(1, Math.min(20, Number(value) || 5));
+    try {
+      const data = await api('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memo_repeat: n }),
+      });
+      state.memoRepeat = Number(data.values?.memo_repeat ?? n) || n;
+      $('#memoRepeatVal').textContent = state.memoRepeat;
+      toast(`重复 ${state.memoRepeat} 次`);
+    } catch (err) {
+      toast(err.message || '设置失败', 'err');
+    }
+  }
+  async function loadMemos() {
+    if (!state.device) {
+      state.memos = [];
+      renderMemoPage();
+      renderMemoTile();
+      return;
+    }
+    try {
+      state.memos = await api('/api/memos?device_id=' + encodeURIComponent(state.device.id));
+      renderMemoPage();
+      renderMemoTile();
+    } catch (err) {
+      if (state.route === 'memo') {
+        $('#memoBody').innerHTML = emptyBlock('读取失败', err.message);
+      }
+    }
+  }
+  const MEMO_WEEKDAY_CN = ['一', '二', '三', '四', '五', '六', '日'];
+  function memoRuleSummary(repeat, time, weekday, day) {
+    if (repeat === 'daily') return `每天 ${time}`;
+    if (repeat === 'weekdays') return `工作日 ${time}`;
+    if (repeat === 'weekly') return `每周${MEMO_WEEKDAY_CN[weekday] || '一'} ${time}`;
+    if (repeat === 'monthly') return `每月 ${day} 日 ${time}`;
+    return '';
+  }
+  function memoNextDue(repeat, hour, minute, weekday, day) {
+    const now = new Date();
+    const atToday = () => new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+    const atOffset = (days) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, hour, minute, 0, 0);
+    if (repeat === 'daily') {
+      let d = atToday();
+      if (d.getTime() <= Date.now() + 30000) d = atOffset(1);
+      return d.getTime();
+    }
+    if (repeat === 'weekdays') {
+      let d = atToday();
+      if (d.getTime() <= Date.now() + 30000) d = atOffset(1);
+      while (d.getDay() === 0 || d.getDay() === 6) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, hour, minute);
+      return d.getTime();
+    }
+    if (repeat === 'weekly') {
+      const target = (weekday + 1) % 7; // 服务端 0=周一；JS 0=周日
+      const delta = (target - now.getDay() + 7) % 7;
+      let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + delta, hour, minute, 0, 0);
+      if (d.getTime() <= Date.now() + 30000) {
+        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7, hour, minute);
+      }
+      return d.getTime();
+    }
+    if (repeat === 'monthly') {
+      for (let i = 0; i < 24; i++) {
+        const month = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const last = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+        if (day > last) continue;
+        const d = new Date(month.getFullYear(), month.getMonth(), day, hour, minute);
+        if (d.getTime() > Date.now() + 30000) return d.getTime();
+      }
+      return null;
+    }
+    return null;
+  }
+  function openMemoForm(memo = null) {
+    if (!memo && !state.device) {
+      toast('先连接设备', 'err');
+      return;
+    }
+    const repeat = memo?.repeat || 'none';
+    state.memoDraftRepeat = repeat;
+    const repeatChips = [
+      ['none', '单次'],
+      ['daily', '每天'],
+      ['weekly', '每周'],
+      ['monthly', '每月'],
+      ['weekdays', '工作日'],
+    ].map(([value, label]) => (
+      `<button type="button" class="chip${value === repeat ? ' on' : ''}" data-repeat="${value}">${label}</button>`
+    )).join('');
+    const when = memo ? localInputValue(memo.due_at) : defaultMemoWhen();
+    const timeValue = (memo ? localInputValue(memo.due_at) : when).split('T')[1] || '09:00';
+    const baseDate = memo ? new Date(memo.due_at * 1000) : new Date();
+    const weekday = memo?.repeat_weekday ?? ((baseDate.getDay() + 6) % 7);
+    const day = memo?.repeat_day ?? baseDate.getDate();
+    const weekdayOptions = ['一', '二', '三', '四', '五', '六', '日'].map((label, i) => (
+      `<option value="${i}" ${i === weekday ? 'selected' : ''}>周${label}</option>`
+    )).join('');
+    const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1).map((value) => (
+      `<option value="${value}" ${value === day ? 'selected' : ''}>${value} 日</option>`
+    )).join('');
+    const endOn = !!(memo?.end_at);
+    const endDate = memo?.end_at ? localDateValue(memo.end_at) : '';
+    const content = `
+      <div class="memo-form">
+        <div class="memo-field">
+          <label for="memoTitle">提醒什么</label>
+          <input id="memoTitle" type="text" maxlength="40" placeholder="例如：交作业" value="${esc(memo?.title || '')}">
+        </div>
+        <div class="memo-field">
+          <label for="memoDetail">备注（可选）</label>
+          <textarea id="memoDetail" maxlength="200" placeholder="补充说明，不会被念出来">${esc(memo?.detail || '')}</textarea>
+        </div>
+        <div class="memo-field">
+          <label for="memoWhen">什么时候</label>
+          <div id="memoWhenSingle" ${repeat === 'none' ? '' : 'hidden'}>
+            <input id="memoWhen" type="datetime-local" step="60" value="${when}">
+          </div>
+          <div id="memoWhenRepeat" ${repeat === 'none' ? 'hidden' : ''}>
+            <div class="memo-when-summary" id="memoWhenSummary">${memoRuleSummary(repeat, timeValue, weekday, day)}</div>
+            <div class="memo-when-controls">
+              <input id="memoTime" type="time" step="60" value="${timeValue}" aria-label="时间">
+              <select id="memoWeekday" aria-label="星期" ${repeat === 'weekly' ? '' : 'hidden'}>${weekdayOptions}</select>
+              <select id="memoDay" aria-label="日期" ${repeat === 'monthly' ? '' : 'hidden'}>${dayOptions}</select>
+            </div>
+          </div>
+        </div>
+        <div class="memo-field">
+          <label>重复</label>
+          <div class="memo-chips" id="memoRepeat">${repeatChips}</div>
+        </div>
+        <div class="memo-field" id="memoEndField" ${repeat === 'none' ? 'hidden' : ''}>
+          <label>结束日期（可选）</label>
+          <div class="memo-end-row">
+            <label class="memo-end-toggle"><input type="checkbox" id="memoEndOn" ${endOn ? 'checked' : ''}> 到这个日期后停止</label>
+          </div>
+          <input id="memoEndDate" type="date" value="${endDate}" ${endOn ? '' : 'disabled'}>
+        </div>
+        <div class="status-line" id="memoFormMsg"></div>
+        <button type="button" class="primary" id="memoSave">${memo ? '保存修改' : '保存'}</button>
+        ${memo ? '<button type="button" class="text-btn danger" id="memoDelete">删除备忘录</button>' : ''}
+      </div>`;
+    openSheet({
+      title: memo ? '编辑备忘录' : '新建备忘录',
+      content,
+      actions: [{ label: '取消', kind: 'ghost' }],
+      onMount: () => wireMemoForm(memo),
+    });
+  }
+  function wireMemoForm(memo) {
+    const repeatBox = $('#memoRepeat');
+    const endField = $('#memoEndField');
+    const endOn = $('#memoEndOn');
+    const endDate = $('#memoEndDate');
+    const whenSingle = $('#memoWhenSingle');
+    const whenRepeat = $('#memoWhenRepeat');
+    const timeInput = $('#memoTime');
+    const weekdaySelect = $('#memoWeekday');
+    const daySelect = $('#memoDay');
+    const summary = $('#memoWhenSummary');
+    const updateSummary = () => {
+      const time = timeInput.value || '09:00';
+      summary.textContent = memoRuleSummary(
+        state.memoDraftRepeat,
+        time,
+        Number(weekdaySelect.value || 0),
+        Number(daySelect.value || 1)
+      );
+    };
+    const syncRepeat = () => {
+      const repeating = state.memoDraftRepeat !== 'none';
+      whenSingle.hidden = repeating;
+      whenRepeat.hidden = !repeating;
+      endField.hidden = !repeating;
+      weekdaySelect.hidden = state.memoDraftRepeat !== 'weekly';
+      daySelect.hidden = state.memoDraftRepeat !== 'monthly';
+      if (repeating) {
+        if (!timeInput.value) {
+          const timePart = ($('#memoWhen').value || '').split('T')[1];
+          if (timePart) timeInput.value = timePart;
+        }
+        endDate.disabled = !endOn.checked;
+      } else {
+        endOn.checked = false;
+        endDate.disabled = true;
+      }
+      updateSummary();
+    };
+    repeatBox.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-repeat]');
+      if (!b) return;
+      state.memoDraftRepeat = b.dataset.repeat;
+      $$('button[data-repeat]', repeatBox).forEach((x) => x.classList.toggle('on', x === b));
+      syncRepeat();
+    });
+    timeInput.addEventListener('input', updateSummary);
+    weekdaySelect.addEventListener('change', updateSummary);
+    daySelect.addEventListener('change', updateSummary);
+    endOn.addEventListener('change', () => {
+      endDate.disabled = !endOn.checked;
+      if (endOn.checked && !endDate.value) {
+        const base = $('#memoWhen').value ? new Date($('#memoWhen').value) : new Date();
+        base.setDate(base.getDate() + 30);
+        endDate.value = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
+      }
+    });
+    $('#memoSave').addEventListener('click', () => saveMemo(memo));
+    const del = $('#memoDelete');
+    if (del) del.addEventListener('click', () => askDeleteMemo(memo));
+    syncRepeat();
+    setTimeout(() => {
+      const title = $('#memoTitle');
+      if (title) title.focus();
+    }, 120);
+  }
+  async function saveMemo(memo) {
+    const msg = (text, kind = 'bad') => {
+      const el = $('#memoFormMsg');
+      el.textContent = text;
+      el.className = 'status-line ' + (kind || '');
+    };
+    const title = ($('#memoTitle').value || '').trim();
+    const detail = ($('#memoDetail').value || '').trim();
+    const when = $('#memoWhen').value;
+    const repeat = state.memoDraftRepeat;
+    const endOn = repeat !== 'none' && $('#memoEndOn').checked;
+    const endDate = endOn ? $('#memoEndDate').value : '';
+    if (!title) {
+      msg('写点要提醒的事吧');
+      $('#memoTitle').focus();
+      return;
+    }
+    let due;
+    if (repeat === 'none') {
+      if (!when) {
+        msg('选个时间');
+        return;
+      }
+      due = new Date(when).getTime();
+      if (!Number.isFinite(due)) {
+        msg('时间格式不对');
+        return;
+      }
+      if (due <= Date.now() + 30000) {
+        msg('单次提醒的时间要晚于现在');
+        return;
+      }
+    } else {
+      const time = ($('#memoTime').value || '').trim();
+      const match = time.match(/^(\d{2}):(\d{2})$/);
+      if (!match) {
+        msg('选个时间');
+        return;
+      }
+      const hour = Number(match[1]);
+      const minute = Number(match[2]);
+      if (hour > 23 || minute > 59) {
+        msg('时间格式不对');
+        return;
+      }
+      due = memoNextDue(
+        repeat,
+        hour,
+        minute,
+        Number($('#memoWeekday').value || 0),
+        Number($('#memoDay').value || 1)
+      );
+      if (!due) {
+        msg('找不到下一次提醒时间');
+        return;
+      }
+    }
+    let endAt = null;
+    if (endOn) {
+      if (!endDate) {
+        msg('选个结束日期');
+        return;
+      }
+      endAt = new Date(endDate + 'T23:59:59').getTime();
+      if (!Number.isFinite(endAt)) {
+        msg('结束日期不对');
+        return;
+      }
+      if (endAt < due) {
+        msg('结束日期要晚于提醒时间');
+        return;
+      }
+    }
+    const device = memo?.device_id || state.device?.id;
+    if (!device) {
+      msg('先连接设备');
+      return;
+    }
+    const body = {
+      device_id: device,
+      title,
+      detail,
+      due_at_ms: due,
+      repeat,
+      end_at_ms: endAt,
+    };
+    const btn = $('#memoSave');
+    btn.disabled = true;
+    btn.textContent = '保存中…';
+    try {
+      if (memo) {
+        await api(`/api/memos/${memo.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } else {
+        await api('/api/memos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      }
+      closeSheet();
+      toast(memo ? '已保存' : '已添加备忘录');
+      await loadMemos();
+      loadRecent();
+    } catch (err) {
+      const text = String(err.message || '保存失败');
+      const detail = text.match(/"detail"\s*:\s*"([^"]+)"/);
+      msg(detail ? detail[1] : text);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = memo ? '保存修改' : '保存';
+    }
+  }
+  async function completeMemo(memo) {
+    try {
+      await api(`/api/memos/${memo.id}/complete`, { method: 'POST' });
+      toast('已完成');
+      await loadMemos();
+      loadRecent();
+    } catch (err) {
+      toast(err.message || '操作失败', 'err');
+    }
+  }
+  async function setMemoEnabled(memo, enabled) {
+    try {
+      await api(`/api/memos/${memo.id}/enabled`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      toast(enabled ? '已启用' : '已暂停');
+      await loadMemos();
+      loadRecent();
+    } catch (err) {
+      toast(err.message || '操作失败', 'err');
+      await loadMemos();
+    }
+  }
+  function askDeleteMemo(memo) {
+    openConfirm({
+      title: '删除这条备忘录？',
+      body: '删除后不会再提醒。',
+      confirm: '删除',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api(`/api/memos/${memo.id}`, { method: 'DELETE' });
+          toast('已删除');
+          await loadMemos();
+          loadRecent();
+        } catch (err) {
+          toast(err.message || '删除失败', 'err');
+        }
+      },
+    });
+  }
+
   /* ---------- 历史 ---------- */
   function dayKey(ts) {
     const d = new Date(ts * 1000);
@@ -2524,7 +3230,9 @@
         ? ['没有消息记录', '在首页让它说句话，记录会出现在这里']
         : state.historyFilter === 'timer'
           ? ['还没有专注记录', '开始一次番茄钟，完成情况会记录在这里']
-          : ['还没有记录', `让${deviceName()}说句话，或开始一次专注`];
+          : state.historyFilter === 'memo'
+            ? ['还没有备忘录提醒', '在备忘录里加一条，到点会出现在这里']
+            : ['还没有记录', `让${deviceName()}说句话，或开始一次专注`];
       box.innerHTML = emptyBlock(copy[0], copy[1]);
       return;
     }
@@ -2786,6 +3494,27 @@
     go('history');
   });
   $('#tileTimer').addEventListener('click', () => go('timer'));
+  $('#tileMemo').addEventListener('click', () => go('memo'));
+  $('#memoAdd').addEventListener('click', () => openMemoForm());
+  $('#memoRepeatMinus').addEventListener('click', () => setMemoRepeat(state.memoRepeat - 1));
+  $('#memoRepeatPlus').addEventListener('click', () => setMemoRepeat(state.memoRepeat + 1));
+  $('#memoBody').addEventListener('click', (e) => {
+    const action = e.target.closest('[data-action]');
+    const row = e.target.closest('[data-memo]');
+    if (!row) return;
+    const memo = state.memos.find((m) => m.id === row.dataset.memo);
+    if (!memo) return;
+    if (action?.dataset.action === 'edit') openMemoForm(memo);
+    else if (action?.dataset.action === 'complete') completeMemo(memo);
+    else if (action?.dataset.action === 'delete') askDeleteMemo(memo);
+  });
+  $('#memoBody').addEventListener('change', (e) => {
+    const input = e.target.closest('[data-toggle]');
+    const row = e.target.closest('[data-memo]');
+    if (!input || !row) return;
+    const memo = state.memos.find((m) => m.id === row.dataset.memo);
+    if (memo) setMemoEnabled(memo, input.checked);
+  });
   // 番茄钟运行中在入口就拦下（用户 2026-11-12 反馈：不要进了遥控页才提示）
   $('#tileTeleop').addEventListener('click', async () => {
     try {
@@ -2874,6 +3603,11 @@
     setInterval(refreshDevices, 5000);
     setInterval(() => { if (state.route === 'home') loadRecent(); }, 15000);
     setInterval(() => { syncActive(); }, 8000);
+    setInterval(() => {
+      if (state.route === 'memo') {
+        loadMemos();
+      }
+    }, 15000);
   }
   init();
 })();

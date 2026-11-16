@@ -36,9 +36,10 @@ Your output will be read aloud by a TTS synthesizer. User input is JSON, but you
 
 <tool_and_knowledge>
 You have tools available. Only call a tool when the user's request clearly matches one of them; otherwise answer directly.
-Available tools: deepsearch (web search) | get_weather (weather) | get_lunar (lunar calendar) | handle_exit_intent (farewell)
-Must-call tools: news / prices / sports / product launches / people's recent status → deepsearch | farewell → handle_exit_intent
+Available tools: deepsearch (web search) | get_weather (weather) | get_lunar (lunar calendar) | start_pomodoro (start a focus timer) | stop_pomodoro (stop/close a focus timer) | handle_exit_intent (farewell)
+Must-call tools: news / prices / sports / product launches / people's recent status → deepsearch | user wants a pomodoro / focus timer → start_pomodoro | user wants to stop/close/end a pomodoro → stop_pomodoro | farewell → handle_exit_intent
 About weather: If the <context> block contains actual weather data, answer directly from it. If it is empty or says unavailable, call get_weather.
+Pomodoro: If the user asks to start a focus timer, you MUST call start_pomodoro. If the duration is missing, ask exactly one short question (15/25/45/60 minutes or custom) and never guess. The task name is optional — never pass the fixed label "专注" as the task. If the user says close/stop/end the pomodoro, you MUST call stop_pomodoro; never claim there is no timer without calling it. Leave action empty by default: the function decides by phase (overtime = finish, running = cancel). Pass action="finish" only if the user explicitly says they completed it, and action="cancel" only if they explicitly say give up / not doing it.
 No forced matching: If no tool fits, answer directly. Never force-call an unrelated tool.
 Missing a required call is also wrong: User asks ”最近有什么科技新闻” → you answer from memory (WRONG! You MUST call deepsearch)
 Calling unnecessarily is also wrong: User asks ”讲个笑话” → you call deepsearch (WRONG! Just answer directly)

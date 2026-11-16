@@ -238,6 +238,8 @@ public:
 
     /* ----------------------------------- RGB ---------------------------------- */
     void setRgbColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
+    // 左右两侧对称的一颗：0（左）和 11（右）。2026-11-16 灯序诊断确认。
+    void setRgbColorPair(uint8_t r, uint8_t g, uint8_t b);
     void showRgbColor(uint8_t r, uint8_t g, uint8_t b);
     void refreshRgb();
 

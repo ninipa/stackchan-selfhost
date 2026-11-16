@@ -50,6 +50,10 @@ class Settings:
     xiaozhi_config: str = "/xiaozhi-config/.config.yaml"
     # 历史保留条数：只在点"清理"时生效，不做后台定时清理。
     history_keep: int = 200
+    # 备忘录：循环规则的本地时区 + tick 间隔/离线补发宽限。
+    timezone: str = "Asia/Shanghai"
+    memo_tick_seconds: int = 15
+    memo_grace_seconds: int = 600
 
 
 def load_settings() -> Settings:
@@ -68,6 +72,9 @@ def load_settings() -> Settings:
         max_repeat=_get_int("MAX_REPEAT", 20),
         xiaozhi_config=os.environ.get("XIAOZHI_CONFIG", "/xiaozhi-config/.config.yaml"),
         history_keep=_get_int("HISTORY_KEEP", 200),
+        timezone=os.environ.get("TZ", "Asia/Shanghai") or "Asia/Shanghai",
+        memo_tick_seconds=_get_int("MEMO_TICK_SECONDS", 15),
+        memo_grace_seconds=_get_int("MEMO_GRACE_SECONDS", 600),
     )
 
 

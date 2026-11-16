@@ -105,3 +105,64 @@ def build_message_script(
         "priority": "normal",
         "steps": steps,
     }
+
+
+def build_memo_script(
+    job_id: str,
+    text: str,
+    audio_url: str,
+    audio_id: str,
+    audio_len: int,
+    gap_ms: int = 500,
+    repeat: int = 5,
+) -> dict[str, Any]:
+    """备忘报到点：暖黄灯 + 点头 + 一句话，重复几遍。
+
+    `text` 是屏幕气泡（会带"点屏幕停止"），音频是另一句更短的播报；
+    第 1 遍用 WS 预推的 audio_id，后面几遍用 audio URL 现取——行为音频槽
+    只有一个，take 之后同一 id 不能复用（和消息脚本同一约定）。
+    """
+    count = max(1, repeat)
+    steps: list[dict[str, Any]] = [
+        {"op": "emotion", "emotion": "happy"},
+        # 暖黄，和消息的绿、番茄钟的紫区分开
+        {"op": "led", "r": 40, "g": 28, "b": 0},
+    ]
+
+    for i in range(count):
+        steps.extend(
+            [
+                {"op": "move", "yaw": 0, "pitch": NOD_PITCH, "speed": MOVE_SPEED},
+                {"op": "move", "yaw": 0, "pitch": HOME_PITCH, "speed": MOVE_SPEED},
+                {"op": "wait", "ms": SETTLE_MS},
+            ]
+        )
+        say: dict[str, Any] = {
+            "op": "say",
+            "audio": audio_url,
+            "audio_len": audio_len,
+            "text": text,
+            "repeat": 1,
+            "gap_ms": gap_ms,
+        }
+        if i == 0:
+            say["audio_id"] = audio_id
+        steps.append(say)
+        if i < count - 1:
+            steps.append({"op": "wait", "ms": 400})
+
+    steps.extend(
+        [
+            {"op": "move", "yaw": 0, "pitch": HOME_PITCH, "speed": 500},
+            {"op": "emotion", "emotion": "neutral"},
+            {"op": "led", "r": 0, "g": 0, "b": 0},
+        ]
+    )
+    return {
+        "v": 1,
+        "job_id": job_id,
+        "priority": "normal",
+        "kind": "memo",
+        "stop_on_touch": True,
+        "steps": steps,
+    }

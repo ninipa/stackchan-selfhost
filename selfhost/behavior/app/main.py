@@ -7,16 +7,16 @@ import os
 import re
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.websockets import WebSocketDisconnect
 
-from . import behavior, db, tts
+from . import behavior, db, recurrence, tts
 from .config import settings
 from .devices import DeviceConnection, registry
 from .teleop import (
@@ -34,7 +34,7 @@ logger = logging.getLogger("chan-behavior")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 AUDIO_NAME_RE = re.compile(r"^[0-9a-f]{16}\.ogg$")
 # 页面版本：部署后前端比对 localStorage，发现不一致自动刷新（2026-11-12 旧页面缓存教训）
-APP_VERSION = "2026-11-12.13"
+APP_VERSION = "2026-11-16.4"
 
 # 行为控制面协议版本：加字段/改语义时 +1；旧固件没有 api_version 视为 0。
 SUPPORTED_API_VERSION = 1
@@ -70,8 +70,15 @@ async def lifespan(_: FastAPI):
             logger.info("prompt warmed: %r", text)
         except Exception as exc:  # noqa: BLE001
             logger.warning("prompt warm failed for %r: %s", text, exc)
-    yield
-    await db.close_db()
+
+    memo_task = asyncio.create_task(_memo_loop())
+    try:
+        yield
+    finally:
+        memo_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await memo_task
+        await db.close_db()
 
 
 app = FastAPI(title="chan-behavior", lifespan=lifespan)
@@ -104,6 +111,39 @@ class TimerRequest(BaseModel):
     label: str = Field(default="专注", max_length=20)
     task: str = Field(default="", max_length=60)
     device_id: str | None = None
+
+
+class MemoRequest(BaseModel):
+    device_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=40)
+    detail: str = Field(default="", max_length=200)
+    due_at_ms: int = Field(gt=0)
+    repeat: str = Field(default=recurrence.REPEAT_NONE)
+    end_at_ms: int | None = Field(default=None, gt=0)
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("title required")
+        return value
+
+    @field_validator("detail")
+    @classmethod
+    def _detail(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("repeat")
+    @classmethod
+    def _repeat(cls, value: str) -> str:
+        if value not in recurrence.REPEAT_VALUES:
+            raise ValueError("invalid repeat")
+        return value
+
+
+class MemoEnabledRequest(BaseModel):
+    enabled: bool
 
 
 # 剩余多少比例时切到全屏引线（用户定：20%，不按总长封顶）
@@ -254,6 +294,33 @@ async def api_devices(_: None = Depends(require_app_token)) -> list[dict]:
     return rows
 
 
+@app.post("/api/devices/{device_id}/reset")
+async def api_device_reset(
+    device_id: str, _: None = Depends(require_app_token)
+) -> dict:
+    """把灯/表情/姿态拉回安全态。
+
+    行为 job 被语音打断时，固件的 cancel_job 只清音频/气泡，不会跑脚本末尾的
+    led off / neutral；这里补一条无音频的 one-shot 脚本，App/维护脚本可随时调用。
+    """
+    conn = registry.get(device_id)
+    if conn is None:
+        raise HTTPException(status_code=409, detail="device offline")
+    script = {
+        "v": 1,
+        "job_id": f"reset-{uuid.uuid4().hex[:8]}",
+        "priority": "normal",
+        "steps": [
+            {"op": "emotion", "emotion": "neutral"},
+            {"op": "move", "yaw": 0, "pitch": 200, "speed": 500},
+            {"op": "led", "r": 0, "g": 0, "b": 0},
+        ],
+    }
+    await conn.send_json({"type": "behavior", "script": script})
+    logger.info("device %s reset script sent", device_id)
+    return {"ok": True}
+
+
 @app.post("/api/devices/{device_id}/screenshot")
 async def api_device_screenshot(
     device_id: str,
@@ -293,6 +360,13 @@ SETTING_SPEC: dict[str, dict] = {
         "max": 5000,
         "default": settings.history_keep,
         "label": "历史保留条数",
+    },
+    "memo_repeat": {
+        "type": "int",
+        "min": 1,
+        "max": 20,
+        "default": 5,
+        "label": "提醒重复次数",
     },
 }
 
@@ -466,10 +540,15 @@ async def api_cleanup(
 
 @app.get("/api/jobs")
 async def api_jobs(
-    limit: int = 20, _: None = Depends(require_app_token)
+    limit: int = 20,
+    type: str | None = None,
+    device_id: str | None = None,
+    _: None = Depends(require_app_token),
 ) -> list[dict]:
-    """最近的 job 列表，用于 App 的「历史」页。"""
-    jobs = await db.list_jobs(limit=max(1, min(limit, 100)))
+    """最近的 job 列表，用于 App 的「历史」页；可按类型/设备过滤。"""
+    jobs = await db.list_jobs(
+        limit=max(1, min(limit, 100)), job_type=type, device_id=device_id
+    )
     # 列表里顺手纠正显示状态：一直 running 但早就过 0 的，历史页应显示「超时中」
     # 而不是「进行中」。只改返回值不写库——真正的状态推进在 get_job / timers/active。
     for job in jobs:
@@ -501,7 +580,7 @@ async def api_cancel_job(
     job = await db.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
-    if job["status"] in ("done", "error", "canceled", "expired"):
+    if job["status"] in ("done", "error", "canceled", "expired", "stopped"):
         # 计时已经结束，但设备上的 HUD 可能还挂着：允许 App 发一次清除
         if job["type"] == "timer":
             conn = registry.get(job["device_id"])
@@ -588,7 +667,7 @@ async def api_timer_active(
 
 @app.post("/api/jobs/{job_id}/finish")
 async def api_finish_job(
-    job_id: str, _: None = Depends(require_app_token)
+    job_id: str, announce: bool = True, _: None = Depends(require_app_token)
 ) -> dict:
     """用户主动结束一次专注。
 
@@ -598,6 +677,9 @@ async def api_finish_job(
     - 超过 2 分钟 → `late`（超时收工）
 
     这是「完成」，和 `cancel` 的「放弃」是两回事：前者计入完成数，后者不计。
+
+    announce=false 时不额外下发「完成了」的人声，给语音链路用：
+    xiaozhi 自己会回一句确认，避免两个 TTS 叠在一起。
     """
     job = await db.get_job(job_id)
     if job is None:
@@ -624,10 +706,10 @@ async def api_finish_job(
             if outcome == "early":
                 # 提前完成：让设备演一遍"完成"（点头一次 + 绿闪 + 气泡）
                 await conn.send_json({"type": "timer_complete", "job_id": job_id})
-                asyncio.create_task(_announce(conn, job, _finished_text(job), "done"))
             else:
-                # 超时后收工：不表演，只把红字收掉；声音仍然给（和面板完成保持一致）
+                # 超时后收工：不表演，只把红字收掉
                 await conn.send_json({"type": "timer_cancel", "job_id": job_id})
+            if announce:
                 asyncio.create_task(_announce(conn, job, _finished_text(job), "done"))
         except Exception as exc:  # noqa: BLE001
             logger.warning("finish notify failed for %s: %s", job_id, exc)
@@ -706,6 +788,350 @@ async def api_message(
     job = await db.get_job(job_id)
     assert job is not None
     return job
+
+
+# ---------- 备忘录 ----------
+# 与番茄钟的区别：番茄钟是"从现在开始的倒计时"，状态由 created_at 推导；
+# 备忘录是"到某个绝对时间做一件事"，必须有后台 tick 检查。tick 只做投递，
+# 状态都落库，重启后按 due_at 继续推进。
+
+
+def _memo_zone():
+    return recurrence.get_zone(settings.timezone)
+
+
+def _memo_view(memo: dict) -> dict:
+    return {
+        "id": memo["id"],
+        "device_id": memo["device_id"],
+        "title": memo["title"],
+        "detail": memo["detail"],
+        "due_at": memo["due_at"],
+        "repeat": memo["repeat"],
+        "repeat_label": recurrence.repeat_label(
+            memo["repeat"], memo.get("repeat_weekday"), memo.get("repeat_day")
+        ),
+        "repeat_time": memo["repeat_time"],
+        "end_at": memo.get("end_at"),
+        "enabled": bool(memo["enabled"]),
+        "last_status": memo.get("last_status"),
+        "last_fired_at": memo.get("last_fired_at"),
+        "created_at": memo["created_at"],
+        "updated_at": memo["updated_at"],
+    }
+
+
+def _memo_times(req: MemoRequest, now: float) -> dict:
+    """把 App 传来的 epoch 归一化成下一次发生时间 + 循环字段。"""
+    tz = _memo_zone()
+    start_at = req.due_at_ms / 1000.0
+    end_at = req.end_at_ms / 1000.0 if req.end_at_ms else None
+    if start_at < 946684800 or start_at > now + 5 * 365 * 86400:
+        raise HTTPException(status_code=422, detail="时间超出允许范围")
+    if end_at is not None and end_at < start_at:
+        raise HTTPException(status_code=422, detail="结束日期早于开始时间")
+
+    repeat_time, weekday, day = recurrence.derive_rule_fields(start_at, req.repeat, tz)
+    try:
+        due_at = recurrence.normalize_first_due(
+            start_at, req.repeat, repeat_time, day, tz, now, end_at
+        )
+    except ValueError as exc:
+        detail = {
+            "time_in_past": "单次备忘录的时间已经过去了",
+            "after_end": "时间超过了结束日期",
+            "no_future_occurrence": "循环规则里找不到下一次时间",
+        }.get(str(exc), "时间不合法")
+        raise HTTPException(status_code=422, detail=detail) from exc
+
+    return {
+        "due_at": due_at,
+        "repeat_time": repeat_time,
+        "repeat_weekday": weekday,
+        "repeat_day": day,
+        "end_at": end_at,
+    }
+
+
+def _memo_next_after(memo: dict, now: float) -> float | None:
+    if memo["repeat"] == recurrence.REPEAT_NONE:
+        return None
+    return recurrence.next_future_due(
+        memo["due_at"],
+        memo["repeat"],
+        memo["repeat_time"],
+        memo.get("repeat_day"),
+        _memo_zone(),
+        now,
+        memo.get("end_at"),
+    )
+
+
+async def _memo_advance(memo: dict, status: str, now: float) -> None:
+    next_due = _memo_next_after(memo, now)
+    changed = await db.advance_memo(
+        memo["id"],
+        expected_due=memo["due_at"],
+        due_at=next_due if next_due is not None else memo["due_at"],
+        enabled=next_due is not None,
+        last_status=status,
+        fired_at=now,
+    )
+    if not changed:
+        logger.info("memo %s changed before advance, skip status=%s", memo["id"], status)
+
+
+def _memo_job_payload(memo: dict) -> dict:
+    return {
+        "memo_id": memo["id"],
+        "title": memo["title"],
+        "detail": memo["detail"],
+        "due_at": memo["due_at"],
+        "repeat": memo["repeat"],
+        "repeat_label": recurrence.repeat_label(
+            memo["repeat"], memo.get("repeat_weekday"), memo.get("repeat_day")
+        ),
+    }
+
+
+async def _memo_fire(conn: DeviceConnection, memo: dict, now: float) -> None:
+    # 合成/发送要 1~2 秒，期间 App 可能已经编辑/删除；旧时间不再发。
+    current = await db.get_memo(memo["id"])
+    if current is None or not current["enabled"] or current["due_at"] != memo["due_at"]:
+        logger.info("memo %s changed before send, skip", memo["id"])
+        return
+
+    job_id = f"memo-{uuid.uuid4().hex[:8]}"
+    await db.create_job(job_id, memo["device_id"], "memo", _memo_job_payload(memo))
+
+    title = memo["title"].strip()
+    spoken = title if title.startswith("提醒") else f"提醒你，{title}"
+
+    try:
+        key = await tts.synth(spoken)
+        audio_bytes = Path(tts.audio_path(key)).read_bytes()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("memo tts failed: %s", memo["id"])
+        await db.update_job(
+            job_id, status="error", error=f"tts: {exc}", finished_at=time.time()
+        )
+        await db.update_memo(memo["id"], last_status="error")
+        return
+
+    # TTS 要 1~2 秒，期间 App 可能已经改时间/暂停/删除；再检一次，避免旧提醒发出去。
+    current = await db.get_memo(memo["id"])
+    if current is None or not current["enabled"] or current["due_at"] != memo["due_at"]:
+        logger.info("memo %s changed during tts, skip send", memo["id"])
+        await db.update_job(
+            job_id, status="canceled", error="memo changed", finished_at=time.time()
+        )
+        return
+
+    # 气泡带"点屏幕停止"；音频仍只念短句。重复 3 遍，点屏幕会进入聆听，
+    # 行为运行时按语音优先让位，从而提前停止。
+    stored = await db.get_settings()
+    memo_repeat = int(_setting_values(stored).get("memo_repeat", 5))
+    display_text = f"点屏幕停止 · {spoken}"
+    script = behavior.build_memo_script(
+        job_id,
+        display_text,
+        tts.audio_url(key),
+        key,
+        len(audio_bytes),
+        gap_ms=500,
+        repeat=memo_repeat,
+    )
+    await db.update_job(
+        job_id,
+        status="sent",
+        script_json=json.dumps(script, ensure_ascii=False),
+        sent_at=time.time(),
+    )
+    try:
+        await _dispatch_job(conn, job_id, script, audio_bytes, key)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("memo send failed: %s", memo["id"])
+        await db.update_job(
+            job_id, status="error", error=f"send: {exc}", finished_at=time.time()
+        )
+        await db.update_memo(memo["id"], last_status="error")
+        return
+
+    await _memo_advance(memo, "sent", now)
+    logger.info(
+        "memo %s fired on %s: %r (%.0fs late)",
+        memo["id"],
+        memo["device_id"],
+        spoken,
+        max(0.0, now - memo["due_at"]),
+    )
+
+
+async def _memo_missed(memo: dict, reason: str, now: float) -> None:
+    job_id = f"memo-{uuid.uuid4().hex[:8]}"
+    await db.create_job(job_id, memo["device_id"], "memo", _memo_job_payload(memo))
+    await db.update_job(job_id, status="missed", error=reason, finished_at=now)
+    await _memo_advance(memo, "missed", now)
+    logger.info("memo %s missed (%s) on %s", memo["id"], reason, memo["device_id"])
+
+
+async def _fire_due_memos() -> None:
+    now = time.time()
+    for memo in await db.list_due_memos(now):
+        if not memo.get("enabled"):
+            continue
+        late = now - memo["due_at"]
+        if late > settings.memo_grace_seconds:
+            conn = registry.get(memo["device_id"])
+            await _memo_missed(memo, "offline" if conn is None else "too_late", now)
+            continue
+        # 同一台设备一次只发一个行为脚本；两条 memo 同时到点时，后一条下一 tick 再发。
+        if await db.has_active_behavior_job(memo["device_id"]):
+            continue
+        conn = registry.get(memo["device_id"])
+        if conn is None:
+            # 设备暂时离线：保留 due_at，宽限窗口内每次 tick 重试。
+            continue
+        await _memo_fire(conn, memo, now)
+
+
+async def _memo_loop() -> None:
+    while True:
+        try:
+            await _fire_due_memos()
+        except Exception:  # noqa: BLE001
+            logger.exception("memo loop failed")
+        await asyncio.sleep(max(1, settings.memo_tick_seconds))
+
+
+@app.get("/api/memos")
+async def api_memos(
+    device_id: str | None = None, _: None = Depends(require_app_token)
+) -> list[dict]:
+    memos = await db.list_memos(device_id)
+    return [_memo_view(memo) for memo in memos]
+
+
+@app.post("/api/memos")
+async def api_memo_create(
+    req: MemoRequest, _: None = Depends(require_app_token)
+) -> dict:
+    now = time.time()
+    times = _memo_times(req, now)
+    memo_id = f"memo-{uuid.uuid4().hex[:8]}"
+    await db.create_memo(
+        memo_id,
+        req.device_id,
+        req.title,
+        req.detail,
+        times["due_at"],
+        req.repeat,
+        times["repeat_time"],
+        times["repeat_weekday"],
+        times["repeat_day"],
+        times["end_at"],
+    )
+    memo = await db.get_memo(memo_id)
+    assert memo is not None
+    logger.info(
+        "memo created: %s on %s at %.0f (%s)",
+        memo_id,
+        req.device_id,
+        times["due_at"],
+        req.repeat,
+    )
+    return _memo_view(memo)
+
+
+@app.put("/api/memos/{memo_id}")
+async def api_memo_update(
+    memo_id: str, req: MemoRequest, _: None = Depends(require_app_token)
+) -> dict:
+    memo = await db.get_memo(memo_id)
+    if memo is None:
+        raise HTTPException(status_code=404, detail="memo not found")
+    if req.device_id != memo["device_id"]:
+        raise HTTPException(status_code=422, detail="device_id 不能修改")
+
+    now = time.time()
+    times = _memo_times(req, now)
+    await db.update_memo(
+        memo_id,
+        title=req.title,
+        detail=req.detail,
+        due_at=times["due_at"],
+        repeat=req.repeat,
+        repeat_time=times["repeat_time"],
+        repeat_weekday=times["repeat_weekday"],
+        repeat_day=times["repeat_day"],
+        end_at=times["end_at"],
+        enabled=1,
+        last_status=None,
+        last_fired_at=None,
+    )
+    updated = await db.get_memo(memo_id)
+    assert updated is not None
+    logger.info("memo updated: %s at %.0f (%s)", memo_id, times["due_at"], req.repeat)
+    return _memo_view(updated)
+
+
+@app.post("/api/memos/{memo_id}/enabled")
+async def api_memo_enabled(
+    memo_id: str, req: MemoEnabledRequest, _: None = Depends(require_app_token)
+) -> dict:
+    memo = await db.get_memo(memo_id)
+    if memo is None:
+        raise HTTPException(status_code=404, detail="memo not found")
+    now = time.time()
+    if req.enabled:
+        if memo["repeat"] == recurrence.REPEAT_NONE:
+            if memo["due_at"] <= now + 1:
+                raise HTTPException(status_code=409, detail="单次备忘录时间已过，请编辑时间")
+            due_at = memo["due_at"]
+        else:
+            due_at = recurrence.next_future_due(
+                memo["due_at"],
+                memo["repeat"],
+                memo["repeat_time"],
+                memo.get("repeat_day"),
+                _memo_zone(),
+                now,
+                memo.get("end_at"),
+            )
+            if due_at is None:
+                raise HTTPException(status_code=409, detail="循环已经结束，请编辑时间")
+        await db.update_memo(memo_id, enabled=1, due_at=due_at, last_status=None)
+    else:
+        # 暂停不是"结束"：App 会把它留在待提醒列表的「已暂停」组里，
+        # 开关可以原地重新启用，不需要再编辑保存。
+        await db.update_memo(memo_id, enabled=0, last_status="paused")
+    updated = await db.get_memo(memo_id)
+    assert updated is not None
+    return _memo_view(updated)
+
+
+@app.post("/api/memos/{memo_id}/complete")
+async def api_memo_complete(
+    memo_id: str, _: None = Depends(require_app_token)
+) -> dict:
+    memo = await db.get_memo(memo_id)
+    if memo is None:
+        raise HTTPException(status_code=404, detail="memo not found")
+    await db.update_memo(memo_id, enabled=0, last_status="completed")
+    updated = await db.get_memo(memo_id)
+    assert updated is not None
+    logger.info("memo completed: %s", memo_id)
+    return _memo_view(updated)
+
+
+@app.delete("/api/memos/{memo_id}")
+async def api_memo_delete(
+    memo_id: str, _: None = Depends(require_app_token)
+) -> dict:
+    if not await db.delete_memo(memo_id):
+        raise HTTPException(status_code=404, detail="memo not found")
+    logger.info("memo deleted: %s", memo_id)
+    return {"ok": True}
 
 
 @app.get("/audio/{name}")
@@ -932,13 +1358,29 @@ async def _handle_device_message(conn: DeviceConnection, msg: dict) -> None:
             conn, msg.get("job_id"), status="done", finished_at=time.time()
         )
     elif typ == "job_error":
+        reason = str(msg.get("error") or "device_error")[:500]
+        job_id = msg.get("job_id")
         await _update_job_if_owned(
             conn,
-            msg.get("job_id"),
-            status="error",
-            error=str(msg.get("error") or "device_error")[:500],
+            job_id,
+            # 点屏幕/语音优先打断不是故障，历史里显示“已停止”而不是“失败”
+            status="stopped" if reason in ("voice_preempted", "touch_stop") else "error",
+            error=reason,
             finished_at=time.time(),
         )
+        # memo 的 last_status 跟着 job 结果走，避免 App 行还显示“已提醒”
+        job = await db.get_job(str(job_id)) if job_id else None
+        if job is not None and job.get("type") == "memo":
+            memo_id = (job.get("payload") or {}).get("memo_id")
+            if memo_id:
+                await db.update_memo(
+                    memo_id,
+                    last_status=(
+                        "stopped"
+                        if reason in ("voice_preempted", "touch_stop", "cancelled")
+                        else "error"
+                    ),
+                )
     elif typ == "state":
         state = msg.get("state") or {}
         if isinstance(state, dict):

@@ -5,6 +5,7 @@
  */
 #include "hal.h"
 #include "chan_snapshot.h"
+#include "behavior/behavior_runtime.h"
 #include <esp_log.h>
 #include <memory>
 #include <mooncake_log.h>
@@ -374,6 +375,10 @@ static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data)
                 // 抽屉打开时，点击语义改成按坐标命中；用松手前的最后一帧坐标，
                 // 免得 release 事件里 point 被清成 (0,0) 而落到左上角
                 pomodoro_panel_tap(last_x, last_y);
+            } else if (behavior_runtime_consume_memo_tap()) {
+                // 备忘录播报中：这次点击只用来停止提醒，不进入聆听（不亮绿灯）
+                last_tap_ms = now;
+                ESP_LOGI("Hal", "[TP] tap consumed: memo stop");
             } else if (last_tap_ms != 0 && (now - last_tap_ms) < kTouchTapMinGapMs) {
                 ESP_LOGI("Hal", "[TP] tap dropped: debounce %ums", (unsigned)(now - last_tap_ms));
             } else if (!hal_bridge::is_xiaozhi_ready()) {

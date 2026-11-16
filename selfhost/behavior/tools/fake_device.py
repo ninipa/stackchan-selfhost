@@ -16,6 +16,8 @@ import websockets
 URL = os.environ.get(
     "FAKE_DEVICE_URL", "ws://127.0.0.1:8100/device/ws?token=dev-device-token"
 )
+# 测番茄钟语音链路时要和真机 MAC 对齐（behavior 的 device_id 是去掉冒号的小写 MAC）。
+DEVICE_ID = os.environ.get("FAKE_DEVICE_ID", "fake-chan")
 
 
 async def heartbeat(ws) -> None:
@@ -30,7 +32,7 @@ async def session() -> None:
             json.dumps(
                 {
                     "type": "hello",
-                    "device_id": "fake-chan",
+                    "device_id": DEVICE_ID,
                     "name": "Fake Chan",
                     "fw": "p0-test",
                     "state": {"voice": "listening"},

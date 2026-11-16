@@ -43,6 +43,29 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_device ON jobs(device_id);
+
+-- 备忘录定义。每次触发仍写一条 jobs(type='memo') 作为"这次提醒"的历史，
+-- 所以这里只保存"下一次什么时候提醒 + 循环规则"。
+CREATE TABLE IF NOT EXISTS memos (
+    id              TEXT PRIMARY KEY,
+    device_id       TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    detail          TEXT NOT NULL DEFAULT '',
+    due_at          REAL NOT NULL,
+    repeat          TEXT NOT NULL DEFAULT 'none',
+    repeat_time     TEXT NOT NULL DEFAULT '',
+    repeat_weekday  INTEGER,
+    repeat_day      INTEGER,
+    end_at          REAL,
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    last_status     TEXT,
+    last_fired_at   REAL,
+    created_at      REAL NOT NULL,
+    updated_at      REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_memos_device ON memos(device_id, enabled, due_at);
+CREATE INDEX IF NOT EXISTS idx_memos_due ON memos(enabled, due_at);
 """
 
 
@@ -196,13 +219,201 @@ async def get_job(job_id: str) -> dict[str, Any] | None:
     return _job_dict(row)
 
 
-async def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
+async def list_jobs(
+    limit: int = 20,
+    job_type: str | None = None,
+    device_id: str | None = None,
+) -> list[dict[str, Any]]:
+    where = []
+    params: list[Any] = []
+    if job_type:
+        where.append("type = ?")
+        params.append(job_type)
+    if device_id:
+        where.append("device_id = ?")
+        params.append(device_id)
+    sql = "SELECT * FROM jobs"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
     async with _lock:
-        cur = await _db().execute(
-            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?", (limit,)
-        )
+        cur = await _db().execute(sql, params)
         rows = await cur.fetchall()
     return [_job_dict(row) for row in rows]
+
+
+# ---------- 备忘录 ----------
+
+
+async def create_memo(
+    memo_id: str,
+    device_id: str,
+    title: str,
+    detail: str,
+    due_at: float,
+    repeat: str,
+    repeat_time: str,
+    repeat_weekday: int | None,
+    repeat_day: int | None,
+    end_at: float | None,
+) -> None:
+    now = time.time()
+    async with _lock:
+        await _db().execute(
+            """
+            INSERT INTO memos(
+                id, device_id, title, detail, due_at, repeat, repeat_time,
+                repeat_weekday, repeat_day, end_at, enabled, last_status,
+                last_fired_at, created_at, updated_at
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NULL, ?, ?)
+            """,
+            (
+                memo_id,
+                device_id,
+                title,
+                detail,
+                due_at,
+                repeat,
+                repeat_time,
+                repeat_weekday,
+                repeat_day,
+                end_at,
+                now,
+                now,
+            ),
+        )
+        await _db().commit()
+
+
+async def get_memo(memo_id: str) -> dict[str, Any] | None:
+    async with _lock:
+        cur = await _db().execute("SELECT * FROM memos WHERE id = ?", (memo_id,))
+        row = await cur.fetchone()
+    return _memo_dict(row) if row else None
+
+
+async def list_memos(device_id: str | None = None) -> list[dict[str, Any]]:
+    sql = "SELECT * FROM memos"
+    params: list[Any] = []
+    if device_id:
+        sql += " WHERE device_id = ?"
+        params.append(device_id)
+    sql += " ORDER BY enabled DESC, due_at ASC, created_at ASC"
+    async with _lock:
+        cur = await _db().execute(sql, params)
+        rows = await cur.fetchall()
+    return [_memo_dict(row) for row in rows]
+
+
+async def list_due_memos(now: float) -> list[dict[str, Any]]:
+    async with _lock:
+        cur = await _db().execute(
+            "SELECT * FROM memos WHERE enabled = 1 AND due_at <= ? ORDER BY due_at",
+            (now,),
+        )
+        rows = await cur.fetchall()
+    return [_memo_dict(row) for row in rows]
+
+
+async def has_active_behavior_job(device_id: str) -> bool:
+    """设备上是否还有未终结的 message/memo 行为脚本。
+
+    行为运行时同一时刻只执行一个脚本；新脚本会 preempt 当前 job。备忘录 tick
+    必须等上一个脚本结束再发，否则后一个的 audio 会把前一个的音频槽清掉，
+    出现 `audio_missing`，且 cancel 不会跑脚本末尾的 led off（黄灯卡住）。
+    """
+    async with _lock:
+        cur = await _db().execute(
+            """
+            SELECT 1 FROM jobs
+            WHERE device_id = ? AND type IN ('message', 'memo')
+              AND status IN ('sent', 'running')
+            LIMIT 1
+            """,
+            (device_id,),
+        )
+        row = await cur.fetchone()
+    return row is not None
+
+
+_MEMO_FIELDS = {
+    "title",
+    "detail",
+    "due_at",
+    "repeat",
+    "repeat_time",
+    "repeat_weekday",
+    "repeat_day",
+    "end_at",
+    "enabled",
+    "last_status",
+    "last_fired_at",
+}
+
+
+async def update_memo(memo_id: str, **fields: Any) -> None:
+    cols = [key for key in fields if key in _MEMO_FIELDS]
+    if not cols:
+        return
+    values = [fields[key] for key in cols]
+    values.extend([time.time(), memo_id])
+    sql = (
+        "UPDATE memos SET "
+        + ", ".join(f"{key} = ?" for key in cols)
+        + ", updated_at = ? WHERE id = ?"
+    )
+    async with _lock:
+        await _db().execute(sql, values)
+        await _db().commit()
+
+
+async def advance_memo(
+    memo_id: str,
+    *,
+    expected_due: float,
+    due_at: float,
+    enabled: bool,
+    last_status: str,
+    fired_at: float,
+) -> bool:
+    """把一次发生推进到下一次。
+
+    带 expected_due 条件：如果别的路径已经改过这一条（例如 App 刚编辑/删除），
+    这次触发就不再生效，避免覆盖新时间。
+    """
+    async with _lock:
+        cur = await _db().execute(
+            """
+            UPDATE memos
+            SET due_at = ?, enabled = ?, last_status = ?, last_fired_at = ?, updated_at = ?
+            WHERE id = ? AND due_at = ?
+            """,
+            (
+                due_at,
+                1 if enabled else 0,
+                last_status,
+                fired_at,
+                time.time(),
+                memo_id,
+                expected_due,
+            ),
+        )
+        await _db().commit()
+        return cur.rowcount > 0
+
+
+async def delete_memo(memo_id: str) -> bool:
+    async with _lock:
+        cur = await _db().execute("DELETE FROM memos WHERE id = ?", (memo_id,))
+        await _db().commit()
+        return cur.rowcount > 0
+
+
+def _memo_dict(row: aiosqlite.Row) -> dict[str, Any]:
+    item = dict(row)
+    item["enabled"] = bool(item.get("enabled"))
+    return item
 
 
 def _job_dict(row: aiosqlite.Row) -> dict[str, Any]:

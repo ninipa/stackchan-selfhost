@@ -97,7 +97,7 @@ int remain_ms(uint32_t now)
 
 void set_led(uint8_t r, uint8_t g, uint8_t b)
 {
-    GetHAL().setRgbColor(0, r, g, b);
+    GetHAL().setRgbColorPair(r, g, b);
     GetHAL().refreshRgb();
 }
 

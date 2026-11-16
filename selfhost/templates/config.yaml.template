@@ -78,6 +78,9 @@ Intent:
       # 质量不如 deepsearch（2026-11-09 定）
       - deepsearch
       - get_weather
+      # 番茄钟语音设置：LLM -> 函数 -> behavior /api/timers -> 设备 timer_start
+      - start_pomodoro
+      - stop_pomodoro
 
 VAD:
   SileroVAD:
@@ -132,3 +135,10 @@ plugins:
     # 留空 = 复用 LLM.DeepSeekLLM.api_key
     api_key: ""
     count: 6
+  pomodoro:
+    # xiaozhi 容器 -> 宿主机 behavior 服务的内部地址。
+    # 容器里不要用 Tailscale 公网地址；OrbStack/Docker Desktop 用 host.docker.internal。
+    base_url: "${BEHAVIOR_INTERNAL_URL}"
+    # 与 behavior/.env 的 APP_TOKEN 一致；由 render 从 deploy.env 注入。
+    app_token: "${APP_TOKEN}"
+    timeout: 5

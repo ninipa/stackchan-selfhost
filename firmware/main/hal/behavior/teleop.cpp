@@ -67,18 +67,14 @@ constexpr uint32_t kAutoSyncRestoreMs = 2000;      // 官方 AVATAR 同款
 constexpr uint32_t kApplyMinIntervalMs = 100;      // 目标应用节流 10Hz
 
 // 隐私指示：会话期间紫色（和语音绿/蓝区分）
-// 实验：单颗 LED 0——光会从壳体扩散，先和 12 颗效果对比（用户 2026-11-12 提议）
+// 左右各一颗（0/11），2026-11-16 灯序诊断确认这一对是对称的。
 constexpr uint8_t kTeleopLedR = 150;
 constexpr uint8_t kTeleopLedG = 40;
 constexpr uint8_t kTeleopLedB = 255;
-constexpr int kPrivacyLedStart = 0;
-constexpr int kPrivacyLedCount = 1;
 
 void set_privacy_leds(uint8_t r, uint8_t g, uint8_t b)
 {
-    for (int i = kPrivacyLedStart; i < kPrivacyLedCount; ++i) {
-        GetHAL().setRgbColor(static_cast<uint8_t>(i), r, g, b);
-    }
+    GetHAL().setRgbColorPair(r, g, b);
     GetHAL().refreshRgb();
 }
 
@@ -504,7 +500,7 @@ void session_start()
     media_acquire();
     ensure_locked();
     apply_teleop_start(500);
-    // 隐私指示：摄像头工作中，单颗 LED 0 紫色（实验：光会从壳体扩散，对比 12 颗效果）
+    // 隐私指示：摄像头工作中，左右各一颗紫色（0/11）
     set_privacy_leds(kTeleopLedR, kTeleopLedG, kTeleopLedB);
     s_privacy_on = true;
     s_last_led_ms = now_ms();
@@ -529,7 +525,7 @@ void session_end(const char* reason)
     motion.setModifyLock(true);
     s_post_hold_until = now_ms() + kPostSessionHoldMs;
     s_auto_sync_off = false;
-    // 关掉隐私指示（单颗 LED 0；语音状态灯结束时会自行刷黑/刷色）
+    // 关掉隐私指示（0/11；语音状态灯结束时会自行刷黑/刷色）
     set_privacy_leds(0, 0, 0);
     s_privacy_on = false;
     // 会话结束立即释放视频 WS 任务，回到"零常驻"

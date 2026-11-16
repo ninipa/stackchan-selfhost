@@ -226,9 +226,14 @@ def build(env: dict[str, str], *, allow_insecure: bool) -> dict[str, str]:
     if not agent_prompt.is_file():
         die(f"找不到 {agent_prompt}")
 
+    behavior_internal_url = validate_base_url(
+        optional(env, "BEHAVIOR_INTERNAL_URL", "http://host.docker.internal:8100")
+    )
+
     values = {
         "DEVICE_HOST": host,
         "PUBLIC_BASE_URL": public_base,
+        "BEHAVIOR_INTERNAL_URL": behavior_internal_url,
         "LLM_API_KEY": llm_key,
         "LLM_MODEL": llm_model,
         "LLM_BASE_URL": llm_base,

@@ -38,6 +38,8 @@ services:
       # 新增插件（不是覆盖）：DeepSeek Search 联网检索。插件目录是扫描发现的，
       # 新文件自动注册，不触碰上游 web_search.py。
       - ./patches/functions/deepsearch.py:/opt/xiaozhi-esp32-server/plugins_func/functions/deepsearch.py:ro
+      # 新增插件（不是覆盖）：番茄钟语音设置。调 behavior 的 /api/timers。
+      - ./patches/functions/pomodoro.py:/opt/xiaozhi-esp32-server/plugins_func/functions/pomodoro.py:ro
       # 新增记忆 provider（不是覆盖）：档案常驻 + 事件检索。工厂按
       # core/providers/memory/<name>/<name>.py 动态 import，新目录自动可用。
       - ./patches/memory/mem_core:/opt/xiaozhi-esp32-server/core/providers/memory/mem_core:ro
