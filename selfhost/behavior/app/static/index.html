@@ -121,6 +121,12 @@
   .hero.offline .hero-pill{color:#E7C6C1;background:rgba(184,66,58,.14);border-color:rgba(184,66,58,.3)}
   .hero.offline .hero-pill .dot{background:#C2564D;box-shadow:none}
   .hero.offline::before{background:radial-gradient(closest-side, rgba(184,66,58,.12), transparent)}
+  /* 状态未知：手机连不上服务端，不能确定设备是死是活——用灰色，别误报离线 */
+  .hero.unknown .eye{background:#6E6556;box-shadow:none;animation:none}
+  .hero.unknown .mouth{border-color:#6E6556}
+  .hero.unknown .hero-pill{color:#D9D0C0;background:rgba(214,203,184,.10);border-color:rgba(214,203,184,.22)}
+  .hero.unknown .hero-pill .dot{background:#A79C88;box-shadow:none}
+  .hero.unknown::before{background:radial-gradient(closest-side, rgba(214,203,184,.08), transparent)}
 
   /* ========== 卡片 / 发消息 ========== */
   .card{
@@ -1289,6 +1295,8 @@
     devices: [],
     device: null,
     deviceOnline: false,
+    // true = 连不上服务端，设备状态未知；不要把它当成“设备离线”
+    connUnknown: false,
     recent: [],
     jobs: [],
     stats: null,
@@ -1347,13 +1355,28 @@
   }
 
   async function api(path, opts = {}) {
-    const headers = Object.assign({ 'X-App-Token': state.token }, opts.headers || {});
+    // timeoutMs 只给状态轮询用（GET）；写操作不要加短超时，
+    // 否则服务端已经处理、App 却报失败，重试可能造成重复消息。
+    const { timeoutMs = 0, ...init } = opts;
+    const headers = Object.assign({ 'X-App-Token': state.token }, init.headers || {});
+    let timer = null;
+    if (timeoutMs > 0) {
+      const controller = new AbortController();
+      init.signal = controller.signal;
+      timer = setTimeout(() => controller.abort(), timeoutMs);
+    }
     let res;
     try {
-      res = await fetch(apiBase() + path, Object.assign({}, opts, { headers }));
+      res = await fetch(apiBase() + path, Object.assign({}, init, { headers }));
     } catch (err) {
-      showBanner(`连不上 ${apiBase()}，检查服务端和网络`);
+      if (err && err.name === 'AbortError') {
+        showBanner(`连接超时（${Math.round(timeoutMs / 1000)}s），检查服务端和网络`);
+      } else {
+        showBanner(`连不上 ${apiBase()}，检查服务端和网络`);
+      }
       throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
     if (res.ok) {
       hideBanner();
@@ -1437,6 +1460,7 @@
       const t = state.playingText;
       return `正在说 · ${t.length > 18 ? t.slice(0, 18) + '…' : t}`;
     }
+    if (state.connUnknown) return '连不上服务器，检查网络';
     if (!state.devicesLoaded) return '正在读取设备状态…';
     const d = state.device;
     if (!d) return '把机器人开机，连上同一个 Wi-Fi';
@@ -1456,13 +1480,19 @@
       || null;
   }
 
+  let refreshDevicesBusy = false;
+
   async function refreshDevices() {
+    // 5s 轮询 + 超时 12s 时可能重叠；让后来的调用复用当前请求，不堆积。
+    if (refreshDevicesBusy) return state.device;
+    refreshDevicesBusy = true;
     try {
-      const devices = await api('/api/devices');
+      const devices = await api('/api/devices', { timeoutMs: 12000 });
       const prevId = state.device?.id;
       state.devices = devices;
       state.device = pickDevice(devices);
       state.devicesLoaded = true;
+      state.connUnknown = false;
       renderDevice();
       if (state.device?.id !== prevId) {
         if (state.route === 'memo') {
@@ -1475,26 +1505,33 @@
       if (state.route === 'teleop' && !teleopState.active) enterTeleopPage();
       return state.device;
     } catch (err) {
-      state.devices = [];
-      state.device = null;
+      // 连不上服务端 ≠ 设备离线：保留上次已知设备，用灰色“状态未知”。
+      // 这样弱网下不会继续显示绿色，也不会把一次手机网络抖动误报成设备掉线。
       state.devicesLoaded = true;
+      state.connUnknown = true;
+      state.deviceOnline = false;
       renderDevice();
       return null;
+    } finally {
+      refreshDevicesBusy = false;
     }
   }
 
   function renderDevice() {
     const d = state.device;
-    const online = !!d && d.online;
+    const online = !state.connUnknown && !!d && d.online;
     state.deviceOnline = online;
 
     const name = deviceName();
     $('#homeName').textContent = name;
     $('#homeName').title = name;
     document.title = name + ' · Chan';
-    $('#hero').classList.toggle('offline', !online);
+    $('#hero').classList.toggle('unknown', state.connUnknown);
+    $('#hero').classList.toggle('offline', !state.connUnknown && !online);
     $('#hero').classList.toggle('no-device', !d);
-    $('#heroStatusText').textContent = d ? (online ? '在线' : '离线') : '未连接';
+    $('#heroStatusText').textContent = state.connUnknown
+      ? '状态未知'
+      : (d ? (online ? '在线' : '离线') : '未连接');
     $('#heroFw').textContent = d?.fw ? `固件 ${d.fw}` : '';
     const tip = $('#timerTipText');
     if (tip) tip.textContent = deviceName();
@@ -1509,7 +1546,9 @@
   function setComposerEnabled(online) {
     $('#sendBtn').disabled = !online || state.sending;
     $('#composer').classList.toggle('offline', !online);
-    $('#composerHint').textContent = online ? '会念出来' : (state.device ? '设备离线' : '无设备');
+    $('#composerHint').textContent = online
+      ? '会念出来'
+      : (state.connUnknown ? '连不上服务器' : (state.device ? '设备离线' : '无设备'));
   }
 
   function renderSettingsDevice() {
@@ -1518,16 +1557,19 @@
     const d = state.device;
     if (!d) {
       box.innerHTML = `<div class="empty small"><div class="empty-face"><i></i><i></i></div>
-        <b>还没有设备</b><p>设备连上后会出现在这里</p></div>`;
+        <b>${state.connUnknown ? '连不上服务器' : '还没有设备'}</b>
+        <p>${state.connUnknown ? '检查手机网络或服务端' : '设备连上后会出现在这里'}</p></div>`;
       return;
     }
     const seen = d.last_seen ? fullTime(d.last_seen) : '—';
+    const stateText = state.connUnknown ? '状态未知' : (d.online ? '在线' : '离线');
+    const pillClass = state.connUnknown || !d.online ? 'mute' : 'ok';
     box.innerHTML = `
       <div class="device-top">
-        <span class="mini-face ${d.online ? '' : 'off'}"><i></i><i></i></span>
+        <span class="mini-face ${state.connUnknown || !d.online ? 'off' : ''}"><i></i><i></i></span>
         <span class="device-id"><b>${esc(d.name || '未命名设备')}</b>
-          <small>${d.online ? '在线' : '离线'} · ${esc(relTime(d.last_seen))}</small></span>
-        <span class="pill ${d.online ? 'ok' : 'mute'}">${d.online ? '在线' : '离线'}</span>
+          <small>${stateText} · ${esc(relTime(d.last_seen))}</small></span>
+        <span class="pill ${pillClass}">${stateText}</span>
       </div>
       <div class="kv">
         <div class="kv-row"><span class="k">MAC</span><span class="v mono">${esc(d.id)}</span></div>
@@ -1759,7 +1801,9 @@
     const msg = $('#timerMsg');
     const hint = state.deviceOnline
       ? ''
-      : (state.device ? '设备离线，暂时不能开始专注' : '还没有设备连接');
+      : (state.connUnknown
+        ? '连不上服务器，暂时不能开始专注'
+        : (state.device ? '设备离线，暂时不能开始专注' : '还没有设备连接'));
     if (hint) {
       msg.textContent = hint;
       msg.className = 'status-line center warn';
@@ -1917,7 +1961,9 @@
     // 回来的旧响应不能再把状态改回去。
     const epoch = state.timerEpoch;
     try {
-      const r = await api('/api/timers/active?device_id=' + encodeURIComponent(target));
+      const r = await api('/api/timers/active?device_id=' + encodeURIComponent(target), {
+        timeoutMs: 12000,
+      });
       if (epoch !== state.timerEpoch) return;
       const t = r.timer;
       if (!t) {
@@ -3550,7 +3596,12 @@
   });
   // 切后台 = 关摄像头（设备侧还有 30s 兜底）
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) checkAppVersion();
+    if (!document.hidden) {
+      // 后台期间 timer 会被 WebView 节流；回前台立即对一次状态，
+      // 不要等 5s 轮询，否则弱网下会先显示一段旧绿色。
+      checkAppVersion();
+      refreshDevices().then(() => syncActive()).catch(() => {});
+    }
     if (document.hidden && state.route === 'teleop') {
       teleopStop();
     } else if (!document.hidden && state.route === 'teleop' && !teleopState.active) {

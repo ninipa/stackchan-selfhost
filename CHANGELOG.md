@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.4 — 2026-11-18
+
+### Server（`selfhost/`）
+
+- 设备在线判定改为心跳新鲜度：`/api/devices` 与 `/health` 只把最近
+  `DEVICE_ONLINE_TTL_SECONDS`（默认 60s）内有过消息的连接算在线，不再只看
+  WebSocket 是否还在 registry。Wi-Fi 静默掉线时，App 不会继续显示绿色接近一小时。
+- 只改展示，不驱逐连接：消息和番茄钟下发仍走 `registry.get()`，心跳晚到的设备
+  不会被误判 offline 或连带 409。
+
+### Web App（`selfhost/behavior/app/static`）
+
+- 从后台回前台立即刷新设备状态，不再等 5s 轮询。
+- `/api/devices`、`/api/timers/active` 增加 12s 超时；状态轮询增加 in-flight 去重。
+- 连不上服务端时显示灰色「状态未知」，保留上次设备并提示检查网络，
+  不再把一次手机网络抖动误报成「设备离线」。
+
+### Known limitations
+
+- 设备真的掉线时 App 最多晚 60s 才变红（检测窗口）。
+- 不改善 Wi-Fi/Tailscale 本身，只让状态更诚实。
+
 ## v0.1.3 — 2026-11-16
 
 ### Firmware（StackChan K151 / ESP-IDF 6.1）

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import time
 from dataclasses import dataclass, field
@@ -48,6 +50,16 @@ class DeviceRegistry:
 
     def list(self) -> list[DeviceConnection]:
         return list(self._devices.values())
+
+    def list_online(self, ttl_seconds: float) -> list[DeviceConnection]:
+        """最近 ttl_seconds 内有过消息的连接。
+
+        只用于展示/统计（/api/devices、/health）。不要在 registry 里驱逐过期连接：
+        消息和番茄钟下发仍靠 registry.get()/first_online()，驱逐会让心跳晚到但仍在线的
+        设备被判成 offline，甚至连带 409。
+        """
+        cutoff = time.time() - ttl_seconds
+        return [conn for conn in self._devices.values() if conn.last_seen >= cutoff]
 
 
 registry = DeviceRegistry()

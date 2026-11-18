@@ -443,6 +443,46 @@ class MemoApiTests(unittest.IsolatedAsyncioTestCase):
             main.tts.audio_url = old_url
             main.registry.unregister("dev-loop")
 
+    async def test_device_online_uses_heartbeat_ttl(self):
+        """在线以心跳新鲜度为准；过期连接只影响展示，不能从 registry 驱逐。"""
+
+        class FakeWS:
+            async def send_json(self, payload):
+                pass
+
+            async def send_bytes(self, data):
+                pass
+
+        now = time.time()
+        fresh = DeviceConnection(device_id="ttl-fresh", ws=FakeWS())
+        fresh.last_seen = now
+        stale = DeviceConnection(device_id="ttl-stale", ws=FakeWS())
+        stale.last_seen = now - main.settings.device_online_ttl_seconds - 60
+        await db.upsert_device("ttl-fresh", "Fresh")
+        await db.upsert_device("ttl-stale", "Stale")
+        main.registry.register(fresh)
+        main.registry.register(stale)
+        try:
+            res = await self.client.get("/api/devices", headers=H)
+            self.assertEqual(res.status_code, 200, res.text)
+            by_id = {d["id"]: d for d in res.json()}
+            self.assertTrue(by_id["ttl-fresh"]["online"])
+            self.assertFalse(by_id["ttl-stale"]["online"])
+
+            # 只改展示，不驱逐：消息/番茄钟下发仍靠 registry.get()
+            self.assertIs(main.registry.get("ttl-stale"), stale)
+            online_ids = {
+                c.device_id
+                for c in main.registry.list_online(
+                    main.settings.device_online_ttl_seconds
+                )
+            }
+            self.assertIn("ttl-fresh", online_ids)
+            self.assertNotIn("ttl-stale", online_ids)
+        finally:
+            main.registry.unregister("ttl-fresh")
+            main.registry.unregister("ttl-stale")
+
 
 if __name__ == "__main__":
     unittest.main()

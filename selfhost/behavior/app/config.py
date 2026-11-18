@@ -45,6 +45,9 @@ class Settings:
     default_gap_ms: int
     max_repeat: int = 20
     device_hello_timeout: float = 10.0
+    # 设备在线判定：最后一次收到消息（含 15s 心跳）超过这个时间就算离线。
+    # 不能只看 WS 是否还在 registry 里：Wi-Fi 静默掉线时 TCP 可能很久不报错。
+    device_online_ttl_seconds: int = 60
     # xiaozhi 的配置文件，只读挂载进来给 App 展示"主对话音色"这类改不动的值。
     # 挂不到就当没配，接口返回 None，不影响其他功能。
     xiaozhi_config: str = "/xiaozhi-config/.config.yaml"
@@ -70,6 +73,10 @@ def load_settings() -> Settings:
         data_dir=os.environ.get("DATA_DIR", "data"),
         default_gap_ms=_get_int("DEFAULT_GAP_MS", 800),
         max_repeat=_get_int("MAX_REPEAT", 20),
+        # 心跳 15s 一次；低于 30s 会把正常抖动误判成离线，直接夹住。
+        device_online_ttl_seconds=max(
+            30, _get_int("DEVICE_ONLINE_TTL_SECONDS", 60)
+        ),
         xiaozhi_config=os.environ.get("XIAOZHI_CONFIG", "/xiaozhi-config/.config.yaml"),
         history_keep=_get_int("HISTORY_KEEP", 200),
         timezone=os.environ.get("TZ", "Asia/Shanghai") or "Asia/Shanghai",

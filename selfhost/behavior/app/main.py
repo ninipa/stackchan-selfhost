@@ -34,7 +34,7 @@ logger = logging.getLogger("chan-behavior")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 AUDIO_NAME_RE = re.compile(r"^[0-9a-f]{16}\.ogg$")
 # 页面版本：部署后前端比对 localStorage，发现不一致自动刷新（2026-11-12 旧页面缓存教训）
-APP_VERSION = "2026-11-16.4"
+APP_VERSION = "2026-11-18.1"
 
 # 行为控制面协议版本：加字段/改语义时 +1；旧固件没有 api_version 视为 0。
 SUPPORTED_API_VERSION = 1
@@ -282,13 +282,25 @@ async def app_page() -> FileResponse:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "devices_online": len(registry.list())}
+    # devices_online 也按心跳新鲜度算，避免面板/测速把一条已经死掉的 WS 算成在线。
+    return {
+        "ok": True,
+        "devices_online": len(
+            registry.list_online(settings.device_online_ttl_seconds)
+        ),
+    }
 
 
 @app.get("/api/devices")
 async def api_devices(_: None = Depends(require_app_token)) -> list[dict]:
     rows = await db.list_devices()
-    online = {conn.device_id for conn in registry.list()}
+    # online = 最近 N 秒内收到过消息，而不是“WS 还在 registry 里”。
+    # 设备 Wi-Fi 静默掉线时，TCP/WS 可能很久不报错（uvicorn ping 是 3600s），
+    # 只看 registry 会让 App 一直显示绿色。
+    online = {
+        conn.device_id
+        for conn in registry.list_online(settings.device_online_ttl_seconds)
+    }
     for row in rows:
         row["online"] = row["id"] in online
     return rows
